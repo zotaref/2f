@@ -1,0 +1,1715 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Telegram 2FA Mini App — Живой генератор TOTP-кодов</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0b1120;
+      color: #f8fafc;
+      overflow-x: hidden;
+      -webkit-tap-highlight-color: transparent;
+      padding-bottom: env(safe-area-inset-bottom, 16px);
+    }
+    button, input, textarea {
+      touch-action: manipulation;
+    }
+    .code-font {
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.04em;
+    }
+    .ring-progress {
+      transition: stroke-dashoffset 0.15s linear, stroke 0.3s ease;
+      transform: rotate(-90deg);
+      transform-origin: 50% 50%;
+    }
+    @keyframes pulseSubtle {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.015); }
+    }
+    .pulse-code {
+      animation: pulseSubtle 0.35s ease-out;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 selection:bg-sky-500 selection:text-white">
+
+  <!-- Toast Notification -->
+  <div id="toastContainer" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-300 opacity-0 -translate-y-2">
+    <div id="toastBox" class="flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-emerald-500/95 text-slate-950 font-semibold text-sm shadow-lg shadow-emerald-500/20 backdrop-blur-md">
+      <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path>
+      </svg>
+      <span id="toastText">Скопійовано в буфер обміну</span>
+    </div>
+  </div>
+
+  <!-- Main Wrapper -->
+  <div class="max-w-4xl mx-auto px-3 py-3 sm:px-4 sm:py-8">
+
+    <!-- Top Language & Mode Bar (Always visible at the top) -->
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3 sm:mb-4">
+      <div id="clientOnlyBanner" class="hidden flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-[11px] sm:text-xs text-indigo-300">
+        <span data-i18n="pureClientBanner">Вы просматриваете чистый интерфейс клиента.</span>
+        <button id="btnExitClientOnly" type="button" class="font-semibold underline hover:text-white shrink-0" data-i18n="pureClientExit">Повернути панель керування</button>
+      </div>
+      <div class="ml-auto flex items-center gap-1 bg-slate-900/95 border border-slate-800 p-1 rounded-xl shadow-md">
+        <button type="button" data-lang-switch="ru" class="lang-btn min-w-[36px] min-h-[30px] px-2.5 py-1 rounded-lg text-xs font-bold transition-all bg-sky-500 text-slate-950 shadow-sm">RU</button>
+        <button type="button" data-lang-switch="uk" class="lang-btn min-w-[36px] min-h-[30px] px-2.5 py-1 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-white">UA</button>
+        <button type="button" data-lang-switch="en" class="lang-btn min-w-[36px] min-h-[30px] px-2.5 py-1 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-white">EN</button>
+      </div>
+    </div>
+
+    <!-- Top Header & Navigation (Hidden when ?mode=client or opened via startapp in Telegram) -->
+    <header id="adminHeader" class="mb-4 sm:mb-6">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 bg-slate-900/90 border border-slate-800/80 rounded-2xl p-3 sm:p-4 shadow-xl">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20 shrink-0">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="text-base sm:text-lg font-bold text-white tracking-tight">Telegram 2FA Hub</h1>
+              <span class="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-400 border border-sky-500/30">Mini App</span>
+            </div>
+            <p class="text-xs text-slate-400" data-i18n="headerSubtitle">Один файл для необмеженої кількості ключів та клієнтів</p>
+          </div>
+        </div>
+
+        <!-- Mode Switcher Tabs -->
+        <nav class="flex items-center bg-slate-950/90 p-1 rounded-xl border border-slate-800/80 self-start sm:self-auto w-full sm:w-auto">
+          <button id="tabBtnClient" type="button" class="flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 bg-sky-500 text-slate-950 shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+            </svg>
+            <span data-i18n="tabClient">Екран клієнта</span>
+          </button>
+          <button id="tabBtnGenerator" type="button" class="flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 text-slate-400 hover:text-white">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+            </svg>
+            <span><span data-i18n="tabKeys">База ключів</span> (<span id="clientCountBadge">3</span>)</span>
+          </button>
+          <button id="tabBtnGuide" type="button" class="flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 text-slate-400 hover:text-white">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+            </svg>
+            <span data-i18n="tabGuide">Як підключити</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <!-- ==================== VIEW 1: CLIENT LIVE 2FA VIEW ==================== -->
+    <section id="viewClient" class="space-y-4 sm:space-y-5">
+      <div class="max-w-md mx-auto bg-gradient-to-b from-slate-900 to-slate-900/95 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-7 shadow-2xl relative overflow-hidden">
+
+        <!-- Decorative ambient glow -->
+        <div class="-top-24 -right-24 w-48 h-48 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" style="position: absolute;"></div>
+
+        <!-- Top status bar -->
+        <div class="flex items-center justify-between gap-2 mb-5">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Google Authenticator (TOTP)</span>
+          </div>
+          <button id="btnTogglePureClient" type="button" class="text-xs text-sky-400 hover:text-sky-300 font-medium flex items-center gap-1" title="Сховати верхнє меню для перевірки вигляду у клієнта">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+            </svg>
+            <span data-i18n="btnClientPreview">Вигляд клієнта</span>
+          </button>
+        </div>
+
+        <!-- Account Credentials Block (Email + Optional Password) -->
+        <div class="space-y-2 mb-4 sm:mb-5">
+          <!-- Account Email Card (Clickable to copy email) -->
+          <div id="accountCopyCard" role="button" tabindex="0" class="group cursor-pointer bg-slate-950/70 hover:bg-slate-900/90 hover:border-sky-500/40 active:scale-[0.99] transition-all border border-slate-800/80 rounded-2xl px-3.5 py-2.5 sm:px-4 sm:py-3 flex items-center justify-between gap-2.5" title="Нажмите, чтобы скопировать почту">
+            <div class="min-w-0">
+              <div class="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
+                <span data-i18n="accountForLogin">Аккаунт для входа</span>
+                <svg class="w-3 h-3 text-slate-500 group-hover:text-sky-400 transition-colors shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                </svg>
+              </div>
+              <div id="activeAccountLabel" class="text-sm sm:text-base font-bold text-white group-hover:text-sky-300 transition-colors truncate select-all">client.account@gmail.com</div>
+            </div>
+            <span class="px-2 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[10px] sm:text-[11px] font-mono text-slate-300 shrink-0" id="activeKeyMasked">JBSW •••• 3PXP</span>
+          </div>
+
+          <!-- Account Password Card (Shown when password is set; clickable to copy in 1 tap) -->
+          <div id="passwordCopyCard" role="button" tabindex="0" class="group cursor-pointer bg-slate-950/70 hover:bg-slate-900/90 hover:border-emerald-500/40 active:scale-[0.99] transition-all border border-slate-800/80 rounded-2xl px-3.5 py-2 sm:px-4 sm:py-2.5 flex items-center justify-between gap-2.5" title="Нажмите, чтобы скопировать пароль">
+            <div class="min-w-0">
+              <div class="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
+                <span data-i18n="passwordForLogin">Пароль от аккаунта</span>
+                <svg class="w-3 h-3 text-slate-500 group-hover:text-emerald-400 transition-colors shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                </svg>
+              </div>
+              <div id="activeAccountPassword" class="text-xs sm:text-sm font-mono font-bold text-emerald-300 group-hover:text-emerald-200 transition-colors truncate select-all">Pass_2026!x9</div>
+            </div>
+            <span class="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-[10px] sm:text-[11px] font-semibold text-emerald-300 shrink-0" data-i18n="tapToCopyBadge">Копировать</span>
+          </div>
+        </div>
+
+        <!-- Main Code + Circular Countdown Ring (Mobile-adapted size & tighter code spacing so digits stay well inside) -->
+        <div class="flex flex-col items-center justify-center my-2 sm:my-4">
+          <div id="timerCircleBox" role="button" tabindex="0" class="group relative flex items-center justify-center mb-3 sm:mb-4 cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-transform" title="Нажмите на круг, чтобы скопировать текущий код">
+            <svg class="w-44 h-44 sm:w-56 sm:h-56" viewBox="0 0 180 180">
+              <circle cx="90" cy="90" r="80" fill="none" stroke="#1e293b" stroke-width="7" />
+              <circle id="timerRing" class="ring-progress" cx="90" cy="90" r="80" fill="none" stroke="#38bdf8" stroke-width="7" stroke-linecap="round" stroke-dasharray="502.65" stroke-dashoffset="0" />
+            </svg>
+            <div class="inset-0 flex flex-col items-center justify-center text-center px-5" style="position: absolute;">
+              <span class="text-[10px] sm:text-[11px] uppercase tracking-widest text-slate-400 group-hover:text-sky-300 transition-colors font-semibold mb-1.5" data-i18n="currentCodeLabel">Текущий код</span>
+              <div id="liveTotpCode" class="code-font text-2xl sm:text-3xl font-extrabold text-white group-hover:text-sky-200 transition-colors select-all leading-none">------</div>
+              <div class="mt-2.5 flex items-center gap-1 text-[11px] font-semibold text-slate-300">
+                <svg class="w-3.5 h-3.5 text-sky-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span><span data-i18n="updatesInPrefix">Обновится через</span> <strong id="secondsLeftText" class="text-white">30</strong> <span data-i18n="secondsUnit">с</span></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Next Code Preview Pill (Clickable to copy next code) -->
+          <div id="nextCodeCopyPill" role="button" tabindex="0" class="group cursor-pointer flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-950/90 hover:bg-slate-900 border border-slate-800/90 hover:border-sky-500/40 active:scale-[0.98] transition-all text-xs text-slate-400 mb-5" title="Нажмите, чтобы скопировать следующий код">
+            <span data-i18n="nextCodeLabel">Следующий код:</span>
+            <span id="nextTotpCode" class="code-font font-bold text-slate-200 group-hover:text-sky-300 transition-colors">------</span>
+            <svg class="w-3.5 h-3.5 text-slate-500 group-hover:text-sky-400 transition-colors" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+            </svg>
+          </div>
+
+          <!-- Primary Copy Code Button -->
+          <button id="btnCopyCode" type="button" class="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 active:scale-[0.99] text-white font-bold text-sm sm:text-base shadow-lg shadow-sky-500/25 transition-all flex items-center justify-center gap-2.5">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+            </svg>
+            <span data-i18n="btnCopy6Digit">Скопіювати 6-значний код</span>
+          </button>
+
+          <!-- Secondary Button: Open QR Code for Google Authenticator -->
+          <button id="btnToggleQrCode" type="button" class="mt-3 w-full py-2.5 px-4 rounded-2xl bg-slate-800/90 hover:bg-slate-800 border border-slate-700/80 text-slate-200 font-semibold text-xs sm:text-sm transition-all flex items-center justify-center gap-2">
+            <svg class="w-4 h-4 text-sky-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 3h3m3 0h-3m0 0v-3m0 3v3"></path>
+            </svg>
+            <span id="qrBtnLabel" data-i18n="btnShowQr">Показати QR-код для Google Authenticator</span>
+          </button>
+
+          <!-- Collapsible QR Code Panel -->
+          <div id="qrCodeContainerPanel" class="hidden mt-4 w-full bg-slate-950/90 border border-slate-800 rounded-2xl p-4 text-center space-y-3">
+            <div class="text-xs font-semibold text-white" data-i18n="qrModalTitle">Скануйте в Google Authenticator</div>
+            <div class="flex justify-center">
+              <div id="qrCodeCanvasBox" class="bg-white p-3 rounded-2xl shadow-lg inline-flex items-center justify-center min-w-[180px] min-h-[180px]"></div>
+            </div>
+            <p class="text-[11px] text-slate-400 leading-relaxed" data-i18n="qrModalHint">
+              Відкрийте Google Authenticator на телефоні → натисніть «+» → «Сканувати QR-код», щоб додати цей акаунт на свій пристрій.
+            </p>
+            <button id="btnCopyOtpAuthUri" type="button" class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[11px] font-semibold text-sky-400 transition-colors" data-i18n="btnCopyOtpUri">
+              Скопіювати otpauth:// посилання
+            </button>
+          </div>
+        </div>
+
+        <!-- Expandable Section: Copy Setup Key for Client's Own Phone or Test Custom Key -->
+        <div class="mt-6 pt-5 border-t border-slate-800/80">
+          <button id="btnToggleKeyDrawer" type="button" class="w-full flex items-center justify-between text-xs font-semibold text-slate-400 hover:text-slate-200 transition-colors py-1">
+            <span data-i18n="drawerToggleText">🔑 Показати ключ для Google Authenticator / змінити ключ</span>
+            <svg id="drawerChevron" class="w-4 h-4 transition-transform duration-200 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"></path>
+            </svg>
+          </button>
+
+          <div id="keyDrawerContent" class="hidden mt-3 space-y-3 bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800/90">
+            <div>
+              <label for="manualSecretInput" class="block text-[11px] font-medium text-slate-400 mb-1" data-i18n="secretInputLabel">Секретний ключ (Base32 або otpauth://)</label>
+              <div class="flex gap-2">
+                <input id="manualSecretInput" type="text" value="JBSWY3DPEHPK3PXP" placeholder="Вставте ключ 2FA..." class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700/80 text-xs font-mono text-white focus:outline-none focus:border-sky-500" />
+                <button id="btnCopySecretKey" type="button" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 shrink-0 transition-colors" data-i18n="btnCopyKeyShort">
+                  Копіювати ключ
+                </button>
+              </div>
+              <p id="secretErrorMsg" class="hidden text-[11px] text-rose-400 mt-1.5" data-i18n="secretErrorText">Некоректний формат Base32. Ключ має містити літери A–Z та цифри 2–7.</p>
+            </div>
+            <div>
+              <label for="manualLabelInput" class="block text-[11px] font-medium text-slate-400 mb-1" data-i18n="accountNameInputLabel">Назва акаунта (бачить клієнт)</label>
+              <input id="manualLabelInput" type="text" value="client.account@gmail.com" placeholder="Например: client.account@gmail.com" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700/80 text-xs text-white focus:outline-none focus:border-sky-500" />
+            </div>
+            <div>
+              <label for="manualPasswordInput" class="block text-[11px] font-medium text-slate-400 mb-1" data-i18n="accountPasswordInputLabel">Пароль от аккаунта (необязательно)</label>
+              <input id="manualPasswordInput" type="text" value="Pass_2026!x9" placeholder="Оставьте пустым, если не нужен" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700/80 text-xs font-mono text-white focus:outline-none focus:border-sky-500" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== VIEW 2: MULTI-CLIENT LINK GENERATOR ==================== -->
+    <section id="viewGenerator" class="hidden space-y-6">
+
+      <!-- How Dynamic Keys Work Banner -->
+      <div class="bg-gradient-to-r from-sky-500/10 via-indigo-500/10 to-slate-900 border border-sky-500/30 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div class="space-y-1">
+          <h2 class="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+            <span data-i18n="genBannerTitle">🚀 Як працюють різні ключі для різних клієнтів?</span>
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-300 leading-relaxed" data-i18n="genBannerDesc">
+            Вам не потрібно редагувати код сайту чи створювати базу даних. Цей додаток зчитує ключ прямо з персонального посилання клієнта (?startapp=... або ?secret=...). Кожен клієнт бачить лише свій код!
+          </p>
+        </div>
+      </div>
+
+      <!-- Bot & Hosting Configuration + Add New Client Form -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Left Column: Settings & Add Form -->
+        <div class="lg:col-span-5 space-y-5">
+
+          <!-- Bot & URL Config Card -->
+          <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <span class="w-6 h-6 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center text-xs font-bold">1</span>
+              <span data-i18n="botSettingsTitle">Параметри вашого Telegram-бота</span>
+            </h3>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label for="botUsernameInput" class="block text-xs font-medium text-slate-400 mb-1" data-i18n="botUsernameLabel">Юзернейм бота</label>
+                <div class="relative">
+                  <span class="inset-y-0 left-3 flex items-center text-slate-500 text-xs" style="position: absolute;">@</span>
+                  <input id="botUsernameInput" type="text" value="my_auth2fa_bot" class="w-full pl-7 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-sky-500" />
+                </div>
+              </div>
+              <div>
+                <label for="appShortNameInput" class="block text-xs font-medium text-slate-400 mb-1" data-i18n="shortNameLabel">Short Name (у BotFather)</label>
+                <input id="appShortNameInput" type="text" value="totp" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-sky-500" />
+              </div>
+            </div>
+
+            <div>
+              <label for="hostedUrlInput" class="block text-xs font-medium text-slate-400 mb-1" data-i18n="hostedUrlLabel">URL вашого хостингу (для WebApp-кнопок)</label>
+              <input id="hostedUrlInput" type="text" value="https://my-shop.github.io/2fa/" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-sky-500" />
+            </div>
+          </div>
+
+          <!-- Add Client Key Card -->
+          <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <span class="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold">2</span>
+                <span data-i18n="addClientTitle">Додати ключі клієнтів</span>
+              </h3>
+              <button id="btnToggleBulkMode" type="button" class="text-xs font-semibold text-sky-400 hover:text-sky-300" data-i18n="bulkToggleBtn">
+                Масовий імпорт списком
+              </button>
+            </div>
+
+            <!-- Single Add Form -->
+            <div id="singleAddForm" class="space-y-3">
+              <div>
+                <label for="newClientLabel" class="block text-xs font-medium text-slate-400 mb-1" data-i18n="newClientNameLabel">Клієнт або назва акаунта</label>
+                <input id="newClientLabel" type="text" placeholder="Например: client.account@gmail.com" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs sm:text-sm text-white focus:outline-none focus:border-sky-500" />
+              </div>
+              <div>
+                <label for="newClientPassword" class="block text-xs font-medium text-slate-400 mb-1" data-i18n="newClientPasswordLabel">Пароль от аккаунта (необязательно)</label>
+                <input id="newClientPassword" type="text" placeholder="Например: Pass_2026!x9" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs sm:text-sm font-mono text-white focus:outline-none focus:border-sky-500" />
+              </div>
+              <div>
+                <label for="newClientSecret" class="block text-xs font-medium text-slate-400 mb-1" data-i18n="newClientSecretLabel">Секретний ключ Google Authenticator</label>
+                <div class="flex gap-2">
+                  <input id="newClientSecret" type="text" placeholder="JBSWY3DPEHPK3PXP" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs sm:text-sm font-mono text-white focus:outline-none focus:border-sky-500" />
+                  <button id="btnGenerateRandomSecret" type="button" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-300 shrink-0" title="Згенерувати тестовий ключ" data-i18n="btnTestKey">
+                    🎲 Тест-ключ
+                  </button>
+                </div>
+              </div>
+              <p id="addFormError" class="hidden text-xs text-rose-400" data-i18n="secretErrorText">Некоректний формат Base32. Ключ має містити літери A–Z та цифри 2–7.</p>
+              <button id="btnAddClientKey" type="button" class="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/15">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path>
+                </svg>
+                <span data-i18n="btnAddClientSubmit">Додати клієнта та створити посилання</span>
+              </button>
+            </div>
+
+            <!-- Bulk Add Form (Hidden by default) -->
+            <div id="bulkAddForm" class="hidden space-y-3">
+              <label for="bulkTextInput" class="block text-xs font-medium text-slate-400" data-i18n="bulkInstructions">
+                Вставте список (кожен з нового рядка у форматі Назва | КЛЮЧ або просто КЛЮЧ):
+              </label>
+              <textarea id="bulkTextInput" rows="4" placeholder="client1@gmail.com | JBSWY3DPEHPK3PXP&#10;client2@gmail.com | GEZDGNBVGY3TQOJQ" class="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-white focus:outline-none focus:border-sky-500"></textarea>
+              <button id="btnBulkImport" type="button" class="w-full py-2.5 px-4 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs sm:text-sm transition-all" data-i18n="btnBulkSubmit">
+                Імпортувати всі ключі
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: Active Clients List & Instant Links -->
+        <div class="lg:col-span-7 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 class="text-sm sm:text-base font-bold text-white" data-i18n="clientsListHeading">Ваші клієнти та живі посилання</h3>
+              <p class="text-xs text-slate-400" data-i18n="clientsListSub">Коди в таблиці також оновлюються кожні 30 секунд</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <input id="searchClientsInput" type="text" placeholder="Пошук клієнта..." class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white focus:outline-none focus:border-sky-500" />
+            </div>
+          </div>
+
+          <!-- Clients Container -->
+          <div id="clientsListContainer" class="space-y-3"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== VIEW 3: STEP-BY-STEP SETUP GUIDE ==================== -->
+    <section id="viewGuide" class="hidden space-y-6">
+      <div class="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6">
+        <div class="max-w-2xl">
+          <h2 class="text-lg sm:text-xl font-bold text-white mb-2" data-i18n="guideMainTitle">Як підключити цей файл до Telegram за 3 хвилини</h2>
+          <p class="text-xs sm:text-sm text-slate-300 leading-relaxed" data-i18n="guideMainSubtitle">
+            Оскільки вся логіка генерації TOTP-кодів вже вбудована у цей один HTML-файл, вам достатньо один раз завантажити його на безкоштовний хостинг (GitHub Pages або Cloudflare Pages) і прив’язати до бота в @BotFather.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <!-- Step 1 -->
+          <div class="bg-slate-950/80 border border-slate-800/90 rounded-2xl p-5 space-y-3">
+            <div class="w-8 h-8 rounded-xl bg-sky-500/20 text-sky-400 font-bold text-sm flex items-center justify-center">1</div>
+            <h3 class="text-sm font-bold text-white" data-i18n="guideStep1Title">Завантажте цей файл на GitHub Pages</h3>
+            <p class="text-xs text-slate-400 leading-relaxed" data-i18n="guideStep1Desc">
+              Збережіть цей файл під назвою index.html, завантажте у безкоштовний публічний репозиторій на GitHub і увімкніть Settings → Pages. Ви отримаєте посилання виду https://ваш-нік.github.io/2fa/.
+            </p>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="bg-slate-950/80 border border-slate-800/90 rounded-2xl p-5 space-y-3">
+            <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 font-bold text-sm flex items-center justify-center">2</div>
+            <h3 class="text-sm font-bold text-white" data-i18n="guideStep2Title">Створіть Mini App у @BotFather</h3>
+            <p class="text-xs text-slate-400 leading-relaxed" data-i18n="guideStep2Desc">
+              Відкрийте @BotFather у Telegram, відправте команду /newapp, оберіть вашого бота, вкажіть ваше посилання з GitHub Pages та задайте коротке ім'я додатка (наприклад, totp).
+            </p>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="bg-slate-950/80 border border-slate-800/90 rounded-2xl p-5 space-y-3">
+            <div class="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 font-bold text-sm flex items-center justify-center">3</div>
+            <h3 class="text-sm font-bold text-white" data-i18n="guideStep3Title">Надсилайте персональні посилання</h3>
+            <p class="text-xs text-slate-400 leading-relaxed" data-i18n="guideStep3Desc">
+              У вкладці «База ключів» додайте ключ нового клієнта та скопіюйте готове повідомлення. Коли клієнт натискає на посилання у повідомленні, прямо в Telegram відкривається вікно з його живим 2FA-кодом!
+            </p>
+          </div>
+        </div>
+
+        <!-- Bonus: Optional Python Bot Snippet for Inline Buttons -->
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-3">
+          <div class="flex items-center justify-between gap-2">
+            <div>
+              <h3 class="text-sm font-bold text-white" data-i18n="guideBonusTitle">Бонус: Як надсилати красиву WebApp-кнопку прямо під повідомленням бота</h3>
+              <p class="text-xs text-slate-400" data-i18n="guideBonusSub">Якщо ви хочете, щоб клієнт натискав не на текстове посилання, а на інлайн-кнопку під повідомленням</p>
+            </div>
+            <button id="btnCopyPythonCode" type="button" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-sky-400 shrink-0" data-i18n="btnCopyPython">
+              Копіювати Python-код
+            </button>
+          </div>
+          <pre id="pythonSnippet" class="text-[11px] font-mono text-slate-300 bg-slate-900/90 p-4 rounded-xl overflow-x-auto border border-slate-800/80">from aiogram import Bot, Dispatcher, types
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+
+# Кнопка передає секретний ключ клієнта прямо у ваш Mini App:
+def get_2fa_keyboard(secret_key: str, label: str = "Account"):
+    url = f"https://my-shop.github.io/2fa/?mode=client&amp;secret={secret_key}&amp;label={label}"
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="🔐 Показати живий 2FA-код", web_app=WebAppInfo(url=url))
+    ]])</pre>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    // ============================================================================
+    // 1. MULTI-LANGUAGE DICTIONARY (UA / RU / EN)
+    // ============================================================================
+    const I18N = {
+      uk: {
+        pureClientBanner: 'Ви переглядаєте чистий інтерфейс клієнта.',
+        pureClientExit: 'Повернути панель керування',
+        headerSubtitle: 'Один файл для необмеженої кількості ключів та клієнтів',
+        tabClient: 'Екран клієнта',
+        tabKeys: 'База ключів',
+        tabGuide: 'Як підключити',
+        btnClientPreview: 'Вигляд клієнта',
+        accountForLogin: 'Акаунт для входу',
+        passwordForLogin: 'Пароль від акаунта',
+        tapToCopyBadge: 'Копіювати',
+        accountPasswordInputLabel: 'Пароль від акаунта (необов’язково)',
+        newClientPasswordLabel: 'Пароль від акаунта (необов’язково)',
+        passwordPlaceholder: 'Залиште порожнім, якщо не потрібен',
+        toastPasswordCopied: 'Пароль скопійовано',
+        msgTemplatePassword: '🔑 Пароль від акаунта:',
+        pwdBadgePrefix: 'Пароль:',
+        currentCodeLabel: 'Поточний код',
+        updatesInPrefix: 'Оновиться через',
+        secondsUnit: 'с',
+        nextCodeLabel: 'Наступний код:',
+        btnCopy6Digit: 'Скопіювати 6-значний код',
+        btnShowQr: 'Показати QR-код для Google Authenticator',
+        btnHideQr: 'Сховати QR-код',
+        qrModalTitle: 'Скануйте в Google Authenticator',
+        qrModalHint: 'Відкрийте Google Authenticator на телефоні → натисніть «+» → «Сканувати QR-код», щоб додати цей акаунт на свій пристрій.',
+        btnCopyOtpUri: 'Скопіювати otpauth:// посилання',
+        toastOtpUriCopied: 'Посилання otpauth:// скопійовано!',
+        drawerToggleText: '🔑 Показати ключ для Google Authenticator / змінити ключ',
+        secretInputLabel: 'Секретний ключ (Base32 або otpauth://)',
+        btnCopyKeyShort: 'Копіювати ключ',
+        secretErrorText: 'Некоректний формат Base32. Ключ має містити літери A–Z та цифри 2–7.',
+        accountNameInputLabel: 'Пошта акаунта (бачить клієнт)',
+        genBannerTitle: '🚀 Як працюють різні ключі для різних клієнтів?',
+        genBannerDesc: 'Вам не потрібно редагувати код сайту чи створювати базу даних. Цей додаток зчитує ключ прямо з персонального посилання клієнта (?startapp=... або ?secret=...). Кожен клієнт бачить лише свій код!',
+        botSettingsTitle: 'Параметри вашого Telegram-бота',
+        botUsernameLabel: 'Юзернейм бота',
+        shortNameLabel: 'Short Name (у BotFather)',
+        hostedUrlLabel: 'URL вашого хостингу (для WebApp-кнопок)',
+        addClientTitle: 'Додати ключі клієнтів',
+        bulkToggleBtn: 'Масовий імпорт списком',
+        singleToggleBtn: 'Поодиноке додавання',
+        newClientNameLabel: 'Пошта клієнта (або логін акаунта)',
+        newClientSecretLabel: 'Секретний ключ Google Authenticator',
+        btnTestKey: '🎲 Тест-ключ',
+        btnAddClientSubmit: 'Додати клієнта та створити посилання',
+        bulkInstructions: 'Вставте список (Пошта | Пароль | КЛЮЧ або Пошта | КЛЮЧ):',
+        btnBulkSubmit: 'Імпортувати всі ключі',
+        clientsListHeading: 'Ваші клієнти та живі посилання',
+        clientsListSub: 'Коди в таблиці також оновлюються кожні 30 секунд',
+        searchPlaceholder: 'Пошук клієнта...',
+        manualSecretPlaceholder: 'Вставте ключ 2FA...',
+        manualLabelPlaceholder: 'Наприклад: client.account@gmail.com',
+        newClientLabelPlaceholder: 'Наприклад: client.account@gmail.com',
+        bulkPlaceholder: 'client1@gmail.com | JBSWY3DPEHPK3PXP\nclient2@gmail.com | GEZDGNBVGY3TQOJQ',
+        emptyClientsText: 'Клієнтів за вашим запитом не знайдено. Додайте новий ключ ліворуч.',
+        keyPrefix: 'Ключ:',
+        btnPreviewCard: 'Переглянути',
+        btnMiniAppLink: '🔗 Mini App лінк',
+        btnChatTemplate: '💬 Шаблон у чат',
+        guideMainTitle: 'Як підключити цей файл до Telegram за 3 хвилини',
+        guideMainSubtitle: 'Оскільки вся логіка генерації TOTP-кодів вже вбудована у цей один HTML-файл, вам достатньо один раз завантажити його на безкоштовний хостинг (GitHub Pages або Cloudflare Pages) і прив’язати до бота в @BotFather.',
+        guideStep1Title: 'Завантажте цей файл на GitHub Pages',
+        guideStep1Desc: 'Збережіть цей файл під назвою index.html, завантажте у безкоштовний публічний репозиторій на GitHub і увімкніть Settings → Pages. Ви отримаєте посилання виду https://ваш-нік.github.io/2fa/.',
+        guideStep2Title: 'Створіть Mini App у @BotFather',
+        guideStep2Desc: 'Відкрийте @BotFather у Telegram, відправте команду /newapp, оберіть вашого бота, вкажіть ваше посилання з GitHub Pages та задайте коротке ім\'я додатка (наприклад, totp).',
+        guideStep3Title: 'Надсилайте персональні посилання',
+        guideStep3Desc: 'У вкладці «База ключів» додайте ключ нового клієнта та скопіюйте готове повідомлення. Коли клієнт натискає на посилання у повідомленні, прямо в Telegram відкривається вікно з його живим 2FA-кодом!',
+        guideBonusTitle: 'Бонус: Як надсилати красиву WebApp-кнопку прямо під повідомленням бота',
+        guideBonusSub: 'Якщо ви хочете, щоб клієнт натискав не на текстове посилання, а на інлайн-кнопку під повідомленням',
+        btnCopyPython: 'Копіювати Python-код',
+        toastCodeCopied: 'Код скопійовано',
+        toastNextCodeCopied: 'Наступний код скопійовано',
+        toastEmailCopied: 'Пошту скопійовано',
+        toastKeyCopied: 'Секретний ключ Base32 скопійовано!',
+        toastClientAdded: 'Додано:',
+        toastBulkImported: 'Імпортовано ключів:',
+        toastBulkError: 'Не знайдено коректних ключів Base32',
+        toastOpenedClient: 'Відкрито:',
+        toastDeletedClient: 'Клієнта видалено зі списку',
+        toastLinkCopied: 'Персональне Mini App посилання скопійовано!',
+        toastMsgCopied: 'Готове повідомлення для клієнта скопійовано!',
+        toastPythonCopied: 'Python-код кнопки скопійовано!',
+        msgTemplateHeader: '🔐 Дані для двофакторної авторизації',
+        msgTemplateLiveLink: '👉 Живий 2FA-код прямо в Telegram (оновлюється кожні 30 с):',
+        msgTemplateManualKey: '🔑 Ключ для ручного додавання у ваш Google Authenticator:'
+      },
+      ru: {
+        pureClientBanner: 'Вы просматриваете чистый интерфейс клиента.',
+        pureClientExit: 'Вернуть панель',
+        headerSubtitle: 'Один файл для неограниченного количества ключей и клиентов',
+        tabClient: 'Экран клиента',
+        tabKeys: 'База ключей',
+        tabGuide: 'Как подключить',
+        btnClientPreview: 'Вид клиента',
+        accountForLogin: 'Аккаунт для входа',
+        passwordForLogin: 'Пароль от аккаунта',
+        tapToCopyBadge: 'Копировать',
+        accountPasswordInputLabel: 'Пароль от аккаунта (необязательно)',
+        newClientPasswordLabel: 'Пароль от аккаунта (необязательно)',
+        passwordPlaceholder: 'Оставьте пустым, если не нужен',
+        toastPasswordCopied: 'Пароль скопирован',
+        msgTemplatePassword: '🔑 Пароль от аккаунта:',
+        pwdBadgePrefix: 'Пароль:',
+        currentCodeLabel: 'Текущий код',
+        updatesInPrefix: 'Обновится через',
+        secondsUnit: 'с',
+        nextCodeLabel: 'Следующий код:',
+        btnCopy6Digit: 'Скопировать 6-значный код',
+        btnShowQr: 'Показать QR-код для Google Authenticator',
+        btnHideQr: 'Скрыть QR-код',
+        qrModalTitle: 'Сканируйте в Google Authenticator',
+        qrModalHint: 'Откройте Google Authenticator на телефоне → нажмите «+» → «Сканировать QR-код», чтобы добавить этот аккаунт на свое устройство.',
+        btnCopyOtpUri: 'Скопировать otpauth:// ссылку',
+        toastOtpUriCopied: 'Ссылка otpauth:// скопирована!',
+        drawerToggleText: '🔑 Показать ключ для Google Authenticator / сменить ключ',
+        secretInputLabel: 'Секретный ключ (Base32 или otpauth://)',
+        btnCopyKeyShort: 'Копировать ключ',
+        secretErrorText: 'Некорректный формат Base32. Ключ должен содержать буквы A–Z и цифры 2–7.',
+        accountNameInputLabel: 'Почта аккаунта (видит клиент)',
+        genBannerTitle: '🚀 Как работают разные ключи для разных клиентов?',
+        genBannerDesc: 'Вам не нужно редактировать код сайта или создавать базу данных. Это приложение считывает ключ прямо из персональной ссылки клиента (?startapp=... или ?secret=...). Каждый клиент видит только свой код!',
+        botSettingsTitle: 'Параметры вашего Telegram-бота',
+        botUsernameLabel: 'Юзернейм бота',
+        shortNameLabel: 'Short Name (в BotFather)',
+        hostedUrlLabel: 'URL вашего хостинга (для WebApp-кнопок)',
+        addClientTitle: 'Добавить ключи клиентов',
+        bulkToggleBtn: 'Массовый импорт списком',
+        singleToggleBtn: 'Одиночное добавление',
+        newClientNameLabel: 'Почта клиента (или логин аккаунта)',
+        newClientSecretLabel: 'Секретный ключ Google Authenticator',
+        btnTestKey: '🎲 Тест-ключ',
+        btnAddClientSubmit: 'Добавить клиента и создать ссылку',
+        bulkInstructions: 'Вставьте список (Почта | Пароль | КЛЮЧ или Почта | КЛЮЧ):',
+        btnBulkSubmit: 'Импортировать все ключи',
+        clientsListHeading: 'Ваши клиенты и живые ссылки',
+        clientsListSub: 'Коды в таблице также обновляются каждые 30 секунд',
+        searchPlaceholder: 'Поиск клиента...',
+        manualSecretPlaceholder: 'Вставьте ключ 2FA...',
+        manualLabelPlaceholder: 'Например: client.account@gmail.com',
+        newClientLabelPlaceholder: 'Например: client.account@gmail.com',
+        bulkPlaceholder: 'client1@gmail.com | JBSWY3DPEHPK3PXP\nclient2@gmail.com | GEZDGNBVGY3TQOJQ',
+        emptyClientsText: 'Клиенты по вашему запросу не найдены. Добавьте новый ключ слева.',
+        keyPrefix: 'Ключ:',
+        btnPreviewCard: 'Открыть',
+        btnMiniAppLink: '🔗 Mini App ссылка',
+        btnChatTemplate: '💬 Шаблон в чат',
+        guideMainTitle: 'Как подключить этот файл к Telegram за 3 минуты',
+        guideMainSubtitle: 'Поскольку вся логика генерации TOTP-кодов уже встроена в этот один HTML-файл, вам достаточно один раз загрузить его на бесплатный хостинг (GitHub Pages или Cloudflare Pages) и привязать к боту в @BotFather.',
+        guideStep1Title: 'Загрузите этот файл на GitHub Pages',
+        guideStep1Desc: 'Сохраните этот файл под именем index.html, загрузите в бесплатный публичный репозиторий на GitHub и включите Settings → Pages. Вы получите ссылку вида https://ваш-ник.github.io/2fa/.',
+        guideStep2Title: 'Создайте Mini App в @BotFather',
+        guideStep2Desc: 'Откройте @BotFather в Telegram, отправьте команду /newapp, выберите вашего бота, укажите вашу ссылку с GitHub Pages и задайте короткое имя приложения (например, totp).',
+        guideStep3Title: 'Отправляйте персональные ссылки',
+        guideStep3Desc: 'Во вкладке «База ключей» добавьте ключ нового клиента и скопируйте готовое сообщение. Когда клиент нажимает на ссылку в сообщении, прямо в Telegram открывается окно с его живым 2FA-кодом!',
+        guideBonusTitle: 'Бонус: Как отправлять красивую WebApp-кнопку прямо под сообщением бота',
+        guideBonusSub: 'Если вы хотите, чтобы клиент нажимал не на текстовую ссылку, а на инлайн-кнопку под сообщением',
+        btnCopyPython: 'Копировать Python-код',
+        toastCodeCopied: 'Код скопирован',
+        toastNextCodeCopied: 'Следующий код скопирован',
+        toastEmailCopied: 'Почта скопирована',
+        toastKeyCopied: 'Секретный ключ Base32 скопирован!',
+        toastClientAdded: 'Добавлено:',
+        toastBulkImported: 'Импортировано ключей:',
+        toastBulkError: 'Не найдено корректных ключей Base32',
+        toastOpenedClient: 'Открыто:',
+        toastDeletedClient: 'Клиент удален из списка',
+        toastLinkCopied: 'Персональная Mini App ссылка скопирована!',
+        toastMsgCopied: 'Готовое сообщение для клиента скопировано!',
+        toastPythonCopied: 'Python-код кнопки скопирован!',
+        msgTemplateHeader: '🔐 Данные для двухфакторной авторизации',
+        msgTemplateLiveLink: '👉 Живой 2FA-код прямо в Telegram (обновляется каждые 30 с):',
+        msgTemplateManualKey: '🔑 Ключ для ручного добавления в ваш Google Authenticator:'
+      },
+      en: {
+        pureClientBanner: 'You are viewing the clean client interface.',
+        pureClientExit: 'Show Admin Bar',
+        headerSubtitle: 'Single file for unlimited 2FA keys and clients',
+        tabClient: 'Client View',
+        tabKeys: 'Key Manager',
+        tabGuide: 'Setup Guide',
+        btnClientPreview: 'Client Preview',
+        accountForLogin: 'Account for login',
+        passwordForLogin: 'Account password',
+        tapToCopyBadge: 'Copy',
+        accountPasswordInputLabel: 'Account password (optional)',
+        newClientPasswordLabel: 'Account password (optional)',
+        passwordPlaceholder: 'Leave empty if not needed',
+        toastPasswordCopied: 'Password copied',
+        msgTemplatePassword: '🔑 Account password:',
+        pwdBadgePrefix: 'Password:',
+        currentCodeLabel: 'Current code',
+        updatesInPrefix: 'Updates in',
+        secondsUnit: 's',
+        nextCodeLabel: 'Next code:',
+        btnCopy6Digit: 'Copy 6-digit code',
+        btnShowQr: 'Show QR code for Google Authenticator',
+        btnHideQr: 'Hide QR code',
+        qrModalTitle: 'Scan in Google Authenticator',
+        qrModalHint: 'Open Google Authenticator on your phone → tap "+" → "Scan a QR code" to add this account to your device.',
+        btnCopyOtpUri: 'Copy otpauth:// URI',
+        toastOtpUriCopied: 'otpauth:// URI copied!',
+        drawerToggleText: '🔑 Show Google Authenticator key / change key',
+        secretInputLabel: 'Secret key (Base32 or otpauth://)',
+        btnCopyKeyShort: 'Copy key',
+        secretErrorText: 'Invalid Base32 format. Key must contain letters A–Z and digits 2–7.',
+        accountNameInputLabel: 'Account email (visible to client)',
+        genBannerTitle: '🚀 How do different keys work for different clients?',
+        genBannerDesc: 'You never need to edit the code or set up a database. This app reads the secret key directly from each client\'s personal link (?startapp=... or ?secret=...). Each client only sees their own code!',
+        botSettingsTitle: 'Your Telegram Bot Settings',
+        botUsernameLabel: 'Bot Username',
+        shortNameLabel: 'Short Name (in BotFather)',
+        hostedUrlLabel: 'Your Hosting URL (for WebApp buttons)',
+        addClientTitle: 'Add Client Keys',
+        bulkToggleBtn: 'Bulk list import',
+        singleToggleBtn: 'Single entry',
+        newClientNameLabel: 'Client email (or account login)',
+        newClientSecretLabel: 'Google Authenticator Secret Key',
+        btnTestKey: '🎲 Test key',
+        btnAddClientSubmit: 'Add client & generate link',
+        bulkInstructions: 'Paste list (Email | Password | KEY or Email | KEY):',
+        btnBulkSubmit: 'Import all keys',
+        clientsListHeading: 'Your Clients & Live Links',
+        clientsListSub: 'Codes in the table also refresh every 30 seconds',
+        searchPlaceholder: 'Search client...',
+        manualSecretPlaceholder: 'Paste 2FA key...',
+        manualLabelPlaceholder: 'e.g. client.account@gmail.com',
+        newClientLabelPlaceholder: 'e.g. client.account@gmail.com',
+        bulkPlaceholder: 'client1@gmail.com | JBSWY3DPEHPK3PXP\nclient2@gmail.com | GEZDGNBVGY3TQOJQ',
+        emptyClientsText: 'No clients match your search. Add a new key on the left.',
+        keyPrefix: 'Key:',
+        btnPreviewCard: 'Preview',
+        btnMiniAppLink: '🔗 Mini App link',
+        btnChatTemplate: '💬 Chat message',
+        guideMainTitle: 'How to Connect This File to Telegram in 3 Minutes',
+        guideMainSubtitle: 'Since all TOTP generation logic is built into this single HTML file, you only need to upload it once to free hosting (GitHub Pages or Cloudflare Pages) and link it to your bot in @BotFather.',
+        guideStep1Title: 'Upload this file to GitHub Pages',
+        guideStep1Desc: 'Save this file as index.html, upload it to a free public GitHub repository, and enable Settings → Pages. You will get a live URL like https://your-name.github.io/2fa/.',
+        guideStep2Title: 'Create a Mini App in @BotFather',
+        guideStep2Desc: 'Open @BotFather in Telegram, send /newapp, choose your bot, paste your GitHub Pages URL, and set a short name for the app (e.g. totp).',
+        guideStep3Title: 'Send personal links to clients',
+        guideStep3Desc: 'In the "Key Manager" tab, add a client\'s key and copy the ready message. When the client taps the link in Telegram, a window with their live 2FA code opens immediately!',
+        guideBonusTitle: 'Bonus: Send a WebApp button right below a bot message',
+        guideBonusSub: 'If you want clients to tap an inline button under a message instead of a text link',
+        btnCopyPython: 'Copy Python code',
+        toastCodeCopied: 'Code copied',
+        toastNextCodeCopied: 'Next code copied',
+        toastEmailCopied: 'Email copied',
+        toastKeyCopied: 'Base32 secret key copied!',
+        toastClientAdded: 'Added:',
+        toastBulkImported: 'Imported keys:',
+        toastBulkError: 'No valid Base32 keys found',
+        toastOpenedClient: 'Opened:',
+        toastDeletedClient: 'Client removed from list',
+        toastLinkCopied: 'Personal Mini App link copied!',
+        toastMsgCopied: 'Ready client message copied!',
+        toastPythonCopied: 'Python button snippet copied!',
+        msgTemplateHeader: '🔐 Two-Factor Authentication Details',
+        msgTemplateLiveLink: '👉 Live 2FA code inside Telegram (refreshes every 30s):',
+        msgTemplateManualKey: '🔑 Setup key for manual entry in Google Authenticator:'
+      }
+    };
+
+    // ============================================================================
+    // 2. PURE JS SHA-1 & HMAC-SHA1 + RFC 6238 TOTP IMPLEMENTATION
+    // ============================================================================
+    const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+
+    function cleanBase32Secret(rawInput) {
+      if (!rawInput) return '';
+      let str = String(rawInput).trim();
+      if (str.toLowerCase().startsWith('otpauth://')) {
+        try {
+          const url = new URL(str);
+          const secretParam = url.searchParams.get('secret');
+          if (secretParam) str = secretParam;
+        } catch (e) {
+          const match = str.match(/[?&]secret=([^&]+)/i);
+          if (match) str = match[1];
+        }
+      }
+      return str.toUpperCase().replace(/[\s\-=]/g, '');
+    }
+
+    function isValidBase32(cleaned) {
+      if (!cleaned || cleaned.length < 8) return false;
+      for (let i = 0; i < cleaned.length; i++) {
+        if (BASE32_ALPHABET.indexOf(cleaned[i]) === -1) return false;
+      }
+      return true;
+    }
+
+    function base32ToBytes(cleaned) {
+      let bits = 0;
+      let value = 0;
+      const output = [];
+      for (let i = 0; i < cleaned.length; i++) {
+        const idx = BASE32_ALPHABET.indexOf(cleaned[i]);
+        if (idx === -1) continue;
+        value = (value << 5) | idx;
+        bits += 5;
+        if (bits >= 8) {
+          output.push((value >>> (bits - 8)) & 0xff);
+          bits -= 8;
+        }
+      }
+      return new Uint8Array(output);
+    }
+
+    function sha1Bytes(msgBytes) {
+      function rotl(n, s) { return (n << s) | (n >>> (32 - s)); }
+      const ml = msgBytes.length;
+      const bitLenHi = Math.floor((ml * 8) / 0x100000000);
+      const bitLenLo = (ml * 8) >>> 0;
+      const padLen = ((ml + 8) >>> 6 << 4) + 16;
+      const words = new Int32Array(padLen);
+      for (let i = 0; i < ml; i++) {
+        words[i >>> 2] |= msgBytes[i] << (24 - (i & 3) * 8);
+      }
+      words[ml >>> 2] |= 0x80 << (24 - (ml & 3) * 8);
+      words[padLen - 2] = bitLenHi;
+      words[padLen - 1] = bitLenLo;
+
+      let h0 = 0x67452301, h1 = 0xefcdab89, h2 = 0x98badcfe, h3 = 0x10325476, h4 = 0xc3d2e1f0;
+      const w = new Int32Array(80);
+
+      for (let i = 0; i < padLen; i += 16) {
+        for (let t = 0; t < 16; t++) w[t] = words[i + t];
+        for (let t = 16; t < 80; t++) w[t] = rotl(w[t - 3] ^ w[t - 8] ^ w[t - 14] ^ w[t - 16], 1);
+
+        let a = h0, b = h1, c = h2, d = h3, e = h4;
+        for (let t = 0; t < 80; t++) {
+          let f, k;
+          if (t < 20) {
+            f = (b & c) | (~b & d);
+            k = 0x5a827999;
+          } else if (t < 40) {
+            f = b ^ c ^ d;
+            k = 0x6ed9eba1;
+          } else if (t < 60) {
+            f = (b & c) | (b & d) | (c & d);
+            k = 0x8f1bbcdc;
+          } else {
+            f = b ^ c ^ d;
+            k = 0xca62c1d6;
+          }
+          const temp = (rotl(a, 5) + f + e + k + w[t]) | 0;
+          e = d; d = c; c = rotl(b, 30) | 0; b = a; a = temp;
+        }
+        h0 = (h0 + a) | 0;
+        h1 = (h1 + b) | 0;
+        h2 = (h2 + c) | 0;
+        h3 = (h3 + d) | 0;
+        h4 = (h4 + e) | 0;
+      }
+
+      const out = new Uint8Array(20);
+      const hs = [h0, h1, h2, h3, h4];
+      for (let i = 0; i < 5; i++) {
+        out[i * 4] = (hs[i] >>> 24) & 0xff;
+        out[i * 4 + 1] = (hs[i] >>> 16) & 0xff;
+        out[i * 4 + 2] = (hs[i] >>> 8) & 0xff;
+        out[i * 4 + 3] = hs[i] & 0xff;
+      }
+      return out;
+    }
+
+    function hmacSha1(keyBytes, messageBytes) {
+      const blockSize = 64;
+      let key = keyBytes;
+      if (key.length > blockSize) {
+        key = sha1Bytes(key);
+      }
+      const oKeyPad = new Uint8Array(blockSize + 20);
+      const iKeyPad = new Uint8Array(blockSize + messageBytes.length);
+      for (let i = 0; i < blockSize; i++) {
+        const k = i < key.length ? key[i] : 0;
+        oKeyPad[i] = k ^ 0x5c;
+        iKeyPad[i] = k ^ 0x36;
+      }
+      iKeyPad.set(messageBytes, blockSize);
+      const innerHash = sha1Bytes(iKeyPad);
+      oKeyPad.set(innerHash, blockSize);
+      return sha1Bytes(oKeyPad);
+    }
+
+    function generateTOTP(rawSecret, counterOffset = 0) {
+      const cleaned = cleanBase32Secret(rawSecret);
+      if (!isValidBase32(cleaned)) return null;
+      const keyBytes = base32ToBytes(cleaned);
+      const epochSeconds = Math.floor(Date.now() / 1000);
+      const timeStep = Math.floor(epochSeconds / 30) + counterOffset;
+
+      const counterBytes = new Uint8Array(8);
+      let temp = timeStep;
+      for (let i = 7; i >= 0; i--) {
+        counterBytes[i] = temp & 0xff;
+        temp = Math.floor(temp / 256);
+      }
+
+      const hmac = hmacSha1(keyBytes, counterBytes);
+      const offset = hmac[hmac.length - 1] & 0x0f;
+      const binary =
+        ((hmac[offset] & 0x7f) << 24) |
+        ((hmac[offset + 1] & 0xff) << 16) |
+        ((hmac[offset + 2] & 0xff) << 8) |
+        (hmac[offset + 3] & 0xff);
+
+      const otp = (binary % 1000000).toString().padStart(6, '0');
+      return otp;
+    }
+
+    // Display 6 continuous digits without spaces so copying or typing directly never includes a space
+    function formatOtpDisplay(otp) {
+      if (!otp || otp.length !== 6) return '------';
+      return otp;
+    }
+
+    function maskSecret(secret) {
+      const cleaned = cleanBase32Secret(secret);
+      if (cleaned.length <= 8) return cleaned;
+      return cleaned.slice(0, 4) + ' •••• ' + cleaned.slice(-4);
+    }
+
+    function encodeStartAppParam(secret, label, password = '') {
+      const cleaned = cleanBase32Secret(secret);
+      if (!label && !password) return cleaned;
+      try {
+        const combined = password ? `${(label || '').slice(0, 40)}\n${password.slice(0, 40)}` : (label || '').slice(0, 40);
+        const bytes = new TextEncoder().encode(combined);
+        let bin = '';
+        bytes.forEach(b => bin += String.fromCharCode(b));
+        const b64 = btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        return `${cleaned}__${b64}`;
+      } catch (e) {
+        return cleaned;
+      }
+    }
+
+    function decodeStartAppParam(param) {
+      if (!param) return null;
+      const parts = String(param).split('__');
+      const secret = cleanBase32Secret(parts[0]);
+      if (!isValidBase32(secret)) return null;
+      let label = 'client.account@gmail.com';
+      let password = '';
+      if (parts[1]) {
+        try {
+          const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+          const bin = atob(b64);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          const decodedStr = new TextDecoder().decode(bytes);
+          const lines = decodedStr.split('\n');
+          label = lines[0] || 'client.account@gmail.com';
+          password = lines.slice(1).join('\n') || '';
+        } catch (e) {
+          label = 'client.account@gmail.com';
+        }
+      }
+      return { secret, label, password };
+    }
+
+    // ============================================================================
+    // 3. APPLICATION STATE & STORAGE
+    // ============================================================================
+    const DEFAULT_CLIENTS = [
+      { id: 'c1', label: 'client.account@gmail.com', password: 'Pass_2026!x9', secret: 'JBSWY3DPEHPK3PXP' },
+      { id: 'c2', label: 'user.login24@gmail.com', password: 'Steam_Login#44', secret: 'GEZDGNBVGY3TQOJQ' },
+      { id: 'c3', label: 'pro.access09@gmail.com', password: '', secret: 'MFRGGZDFMZTWQ2LK' }
+    ];
+
+    const state = {
+      lang: 'ru', // 'ru' (default) | 'uk' | 'en'
+      activeTab: 'client', // 'client' | 'generator' | 'guide'
+      pureClientMode: false,
+      activeSecret: 'JBSWY3DPEHPK3PXP',
+      activeLabel: 'client.account@gmail.com',
+      activePassword: 'Pass_2026!x9',
+      botUsername: 'my_auth2fa_bot',
+      appShortName: 'totp',
+      hostedUrl: 'https://my-shop.github.io/2fa/',
+      searchQuery: '',
+      clients: [...DEFAULT_CLIENTS],
+      lastRenderedOtp: ''
+    };
+
+    function t(key) {
+      const dict = I18N[state.lang] || I18N.ru;
+      return dict[key] || I18N.ru[key] || key;
+    }
+
+    function setLanguage(lang) {
+      if (!I18N[lang]) return;
+      state.lang = lang;
+      document.documentElement.lang = lang;
+
+      // Update top language buttons
+      document.querySelectorAll('[data-lang-switch]').forEach(btn => {
+        if (btn.getAttribute('data-lang-switch') === lang) {
+          btn.className = 'lang-btn min-w-[36px] min-h-[30px] px-2.5 py-1 rounded-lg text-xs font-bold transition-all bg-sky-500 text-slate-950 shadow-sm';
+        } else {
+          btn.className = 'lang-btn min-w-[36px] min-h-[30px] px-2.5 py-1 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-white';
+        }
+      });
+
+      // Translate all static [data-i18n] nodes
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        // Handle toggle button text if bulk form is open
+        if (key === 'bulkToggleBtn') {
+          const isBulkOpen = !document.getElementById('bulkAddForm').classList.contains('hidden');
+          el.textContent = isBulkOpen ? t('singleToggleBtn') : t('bulkToggleBtn');
+        } else if (key === 'btnShowQr') {
+          const isQrOpen = !document.getElementById('qrCodeContainerPanel').classList.contains('hidden');
+          el.textContent = isQrOpen ? t('btnHideQr') : t('btnShowQr');
+        } else {
+          el.textContent = t(key);
+        }
+      });
+
+      // Update input placeholders for selected language
+      const searchInput = document.getElementById('searchClientsInput');
+      if (searchInput) searchInput.placeholder = t('searchPlaceholder');
+      const manualSecretInput = document.getElementById('manualSecretInput');
+      if (manualSecretInput) manualSecretInput.placeholder = t('manualSecretPlaceholder');
+      const manualLabelInput = document.getElementById('manualLabelInput');
+      if (manualLabelInput) manualLabelInput.placeholder = t('manualLabelPlaceholder');
+      const manualPasswordInput = document.getElementById('manualPasswordInput');
+      if (manualPasswordInput) manualPasswordInput.placeholder = t('passwordPlaceholder');
+      const newClientPassword = document.getElementById('newClientPassword');
+      if (newClientPassword) newClientPassword.placeholder = t('passwordPlaceholder');
+      const newClientLabel = document.getElementById('newClientLabel');
+      if (newClientLabel) newClientLabel.placeholder = t('newClientLabelPlaceholder');
+      const bulkTextInput = document.getElementById('bulkTextInput');
+      if (bulkTextInput) bulkTextInput.placeholder = t('bulkPlaceholder');
+
+      saveState();
+      renderClientsList();
+    }
+
+    function loadSavedState() {
+      try {
+        const savedClients = localStorage.getItem('tg_2fa_clients_v4');
+        if (savedClients) {
+          const parsed = JSON.parse(savedClients);
+          if (Array.isArray(parsed) && parsed.length > 0) state.clients = parsed;
+        }
+        const savedConfig = localStorage.getItem('tg_2fa_config_v4');
+        if (savedConfig) {
+          const cfg = JSON.parse(savedConfig);
+          if (cfg.botUsername) state.botUsername = cfg.botUsername;
+          if (cfg.appShortName) state.appShortName = cfg.appShortName;
+          if (cfg.hostedUrl) state.hostedUrl = cfg.hostedUrl;
+          if (cfg.lang && I18N[cfg.lang]) state.lang = cfg.lang;
+        }
+      } catch (e) {
+        // Ignore storage restrictions in sandboxed environments
+      }
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem('tg_2fa_clients_v4', JSON.stringify(state.clients));
+        localStorage.setItem('tg_2fa_config_v4', JSON.stringify({
+          botUsername: state.botUsername,
+          appShortName: state.appShortName,
+          hostedUrl: state.hostedUrl,
+          lang: state.lang
+        }));
+      } catch (e) {
+        // Ignore storage restrictions
+      }
+    }
+
+    function checkIncomingParameters() {
+      const params = new URLSearchParams(window.location.search);
+      const urlLang = params.get('lang');
+      if (urlLang && I18N[urlLang]) {
+        state.lang = urlLang;
+      }
+      // Expand Telegram Mini App to full mobile height automatically
+      if (window.Telegram && window.Telegram.WebApp) {
+        try {
+          window.Telegram.WebApp.ready();
+          window.Telegram.WebApp.expand();
+        } catch (e) {}
+      }
+
+      const tgStartParam =
+        (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.start_param) ||
+        params.get('tgWebAppStartParam') ||
+        params.get('startapp');
+
+      if (tgStartParam) {
+        const decoded = decodeStartAppParam(tgStartParam);
+        if (decoded) {
+          state.activeSecret = decoded.secret;
+          state.activeLabel = decoded.label;
+          state.activePassword = decoded.password || '';
+          state.pureClientMode = true;
+          return;
+        }
+      }
+
+      const urlSecret = params.get('secret') || params.get('key');
+      if (urlSecret && isValidBase32(cleanBase32Secret(urlSecret))) {
+        state.activeSecret = cleanBase32Secret(urlSecret);
+        state.activeLabel = params.get('label') || 'client.account@gmail.com';
+        state.activePassword = params.get('pwd') || params.get('password') || '';
+        if (params.get('mode') === 'client') {
+          state.pureClientMode = true;
+        }
+      }
+    }
+
+    // ============================================================================
+    // 4. UI HELPERS & CLIPBOARD
+    // ============================================================================
+    let toastTimer = null;
+    function showToast(message) {
+      const container = document.getElementById('toastContainer');
+      const textEl = document.getElementById('toastText');
+      textEl.textContent = message;
+      container.classList.remove('opacity-0', '-translate-y-2');
+      container.classList.add('opacity-100', 'translate-y-0');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        container.classList.remove('opacity-100', 'translate-y-0');
+        container.classList.add('opacity-0', '-translate-y-2');
+      }, 2200);
+    }
+
+    function copyText(text, successMsg) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast(successMsg);
+        }).catch(() => fallbackCopy(text, successMsg));
+      } else {
+        fallbackCopy(text, successMsg);
+      }
+    }
+
+    function fallbackCopy(text, successMsg) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast(successMsg);
+      } catch (e) {
+        showToast(successMsg);
+      }
+      document.body.removeChild(ta);
+    }
+
+    // ============================================================================
+    // 5. VIEW RENDERING & LIVE TIMER ENGINE
+    // ============================================================================
+    function switchTab(tabName) {
+      state.activeTab = tabName;
+      const views = {
+        client: document.getElementById('viewClient'),
+        generator: document.getElementById('viewGenerator'),
+        guide: document.getElementById('viewGuide')
+      };
+      const buttons = {
+        client: document.getElementById('tabBtnClient'),
+        generator: document.getElementById('tabBtnGenerator'),
+        guide: document.getElementById('tabBtnGuide')
+      };
+
+      Object.keys(views).forEach(k => {
+        if (k === tabName) {
+          views[k].classList.remove('hidden');
+          buttons[k].className = 'flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 bg-sky-500 text-slate-950 shadow-sm';
+        } else {
+          views[k].classList.add('hidden');
+          buttons[k].className = 'flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 text-slate-400 hover:text-white';
+        }
+      });
+
+      if (tabName === 'generator') {
+        renderClientsList();
+      }
+    }
+
+    function applyPureClientModeUI() {
+      const header = document.getElementById('adminHeader');
+      const banner = document.getElementById('clientOnlyBanner');
+      const toggleBtn = document.getElementById('btnTogglePureClient');
+      if (state.pureClientMode) {
+        header.classList.add('hidden');
+        banner.classList.remove('hidden');
+        toggleBtn.classList.add('hidden');
+        switchTab('client');
+      } else {
+        header.classList.remove('hidden');
+        banner.classList.add('hidden');
+        toggleBtn.classList.remove('hidden');
+      }
+    }
+
+    function buildOtpAuthUri() {
+      const cleaned = cleanBase32Secret(state.activeSecret);
+      const label = encodeURIComponent(state.activeLabel || 'client.account@gmail.com');
+      return `otpauth://totp/${label}?secret=${cleaned}&issuer=Telegram2FA&algorithm=SHA1&digits=6&period=30`;
+    }
+
+    function renderQrCode() {
+      const box = document.getElementById('qrCodeCanvasBox');
+      if (!box) return;
+      const uri = buildOtpAuthUri();
+      if (typeof qrcode === 'function') {
+        try {
+          const qr = qrcode(0, 'M');
+          qr.addData(uri);
+          qr.make();
+          box.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+          const svg = box.querySelector('svg');
+          if (svg) {
+            svg.setAttribute('width', '168');
+            svg.setAttribute('height', '168');
+            svg.style.display = 'block';
+          }
+          return;
+        } catch (e) {
+          // fallback below
+        }
+      }
+      box.innerHTML = `<div class="text-xs font-mono text-slate-900 break-all max-w-[168px] p-2">${escapeHtml(cleanBase32Secret(state.activeSecret))}</div>`;
+    }
+
+    function updateClientViewStaticFields() {
+      document.getElementById('activeAccountLabel').textContent = state.activeLabel || 'client.account@gmail.com';
+      document.getElementById('activeKeyMasked').textContent = maskSecret(state.activeSecret);
+      const pwdCard = document.getElementById('passwordCopyCard');
+      const pwdText = document.getElementById('activeAccountPassword');
+      if (state.activePassword && state.activePassword.trim()) {
+        pwdCard.classList.remove('hidden');
+        pwdText.textContent = state.activePassword.trim();
+      } else {
+        pwdCard.classList.add('hidden');
+        pwdText.textContent = '';
+      }
+      const secretInput = document.getElementById('manualSecretInput');
+      const labelInput = document.getElementById('manualLabelInput');
+      const pwdInput = document.getElementById('manualPasswordInput');
+      if (document.activeElement !== secretInput) secretInput.value = state.activeSecret;
+      if (document.activeElement !== labelInput) labelInput.value = state.activeLabel;
+      if (pwdInput && document.activeElement !== pwdInput) pwdInput.value = state.activePassword || '';
+      renderQrCode();
+    }
+
+    function buildClientLinks(client) {
+      const bot = (state.botUsername || 'my_auth2fa_bot').replace(/^@/, '').trim();
+      const shortName = (state.appShortName || 'totp').trim();
+      const baseHost = (state.hostedUrl || 'https://my-shop.github.io/2fa/').trim();
+      const startParam = encodeStartAppParam(client.secret, client.label, client.password || '');
+
+      const tgMiniAppLink = `https://t.me/${bot}/${shortName}?startapp=${startParam}`;
+      const sep = baseHost.includes('?') ? '&' : '?';
+      const pwdQuery = client.password ? `&pwd=${encodeURIComponent(client.password)}` : '';
+      const directWebAppUrl = `${baseHost}${sep}mode=client&lang=${state.lang}&secret=${cleanBase32Secret(client.secret)}&label=${encodeURIComponent(client.label)}${pwdQuery}`;
+
+      return { tgMiniAppLink, directWebAppUrl };
+    }
+
+    function renderClientsList() {
+      const container = document.getElementById('clientsListContainer');
+      const badge = document.getElementById('clientCountBadge');
+      badge.textContent = String(state.clients.length);
+
+      const q = state.searchQuery.toLowerCase().trim();
+      const filtered = state.clients.filter(c =>
+        c.label.toLowerCase().includes(q) || c.secret.toLowerCase().includes(q)
+      );
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-8 text-center text-slate-400 text-xs sm:text-sm">
+            ${escapeHtml(t('emptyClientsText'))}
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map(client => {
+        const otp = generateTOTP(client.secret, 0);
+        const { tgMiniAppLink } = buildClientLinks(client);
+        return `
+          <div class="bg-slate-900/95 border border-slate-800 hover:border-slate-700 rounded-2xl p-4 transition-all space-y-3" data-client-card="${client.id}">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
+              <div class="min-w-0 space-y-0.5">
+                <div class="text-sm font-bold text-white truncate">${escapeHtml(client.label)}</div>
+                ${client.password ? `<div class="text-[11px] font-mono text-emerald-400 truncate">${escapeHtml(t('pwdBadgePrefix'))} ${escapeHtml(client.password)}</div>` : ''}
+                <div class="text-[11px] font-mono text-slate-400 break-all">${escapeHtml(t('keyPrefix'))} ${escapeHtml(cleanBase32Secret(client.secret))}</div>
+              </div>
+
+              <div class="flex items-center justify-between sm:justify-end gap-2">
+                <button type="button" data-action="copy-client-otp" data-id="${client.id}" class="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-sky-500/50 flex items-center gap-2 transition-colors">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  <span class="code-font text-sm font-bold text-sky-400" data-live-otp="${client.id}">${formatOtpDisplay(otp)}</span>
+                </button>
+
+                <button type="button" data-action="preview-client" data-id="${client.id}" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition-colors">
+                  ${escapeHtml(t('btnPreviewCard'))}
+                </button>
+
+                <button type="button" data-action="delete-client" data-id="${client.id}" class="p-1.5 rounded-xl bg-slate-950 hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 transition-colors">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Generated Link Row -->
+            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 pt-2 border-t border-slate-800/70">
+              <div class="sm:col-span-7 flex items-center bg-slate-950 border border-slate-800/90 rounded-xl px-3 py-1.5">
+                <span class="text-[11px] font-mono text-slate-300 truncate select-all">${escapeHtml(tgMiniAppLink)}</span>
+              </div>
+              <div class="sm:col-span-5 flex items-center gap-1.5">
+                <button type="button" data-action="copy-tg-link" data-id="${client.id}" class="flex-1 py-1.5 px-2.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-300 text-xs font-semibold transition-colors">
+                  ${escapeHtml(t('btnMiniAppLink'))}
+                </button>
+                <button type="button" data-action="copy-client-msg" data-id="${client.id}" class="flex-1 py-1.5 px-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-semibold transition-colors">
+                  ${escapeHtml(t('btnChatTemplate'))}
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function tickTimer() {
+      const nowMs = Date.now();
+      const epochSec = nowMs / 1000;
+      const elapsedInWindow = epochSec % 30;
+      const remainingSec = Math.ceil(30 - elapsedInWindow);
+      const fractionRemaining = (30 - elapsedInWindow) / 30;
+
+      // Update main circular ring (r = 80 => circumference = 2 * pi * 80 = 502.65)
+      const circumference = 502.65;
+      const offset = circumference * (1 - fractionRemaining);
+      const ring = document.getElementById('timerRing');
+      const secText = document.getElementById('secondsLeftText');
+
+      if (ring && secText) {
+        ring.style.strokeDashoffset = String(offset);
+        secText.textContent = String(remainingSec);
+
+        if (remainingSec <= 5) {
+          ring.setAttribute('stroke', '#f43f5e'); // Rose
+        } else if (remainingSec <= 10) {
+          ring.setAttribute('stroke', '#f59e0b'); // Amber
+        } else {
+          ring.setAttribute('stroke', '#38bdf8'); // Sky
+        }
+      }
+
+      // Update primary client TOTP code
+      const currentOtp = generateTOTP(state.activeSecret, 0);
+      const nextOtp = generateTOTP(state.activeSecret, 1);
+      const codeEl = document.getElementById('liveTotpCode');
+      const nextEl = document.getElementById('nextTotpCode');
+
+      if (codeEl && nextEl) {
+        const formatted = formatOtpDisplay(currentOtp);
+        if (formatted !== state.lastRenderedOtp) {
+          state.lastRenderedOtp = formatted;
+          codeEl.textContent = formatted;
+          codeEl.classList.remove('pulse-code');
+          void codeEl.offsetWidth;
+          codeEl.classList.add('pulse-code');
+        }
+        nextEl.textContent = formatOtpDisplay(nextOtp);
+      }
+
+      // Update live OTP badges in Generator table if visible
+      if (state.activeTab === 'generator') {
+        state.clients.forEach(c => {
+          const badgeEl = document.querySelector(`[data-live-otp="${c.id}"]`);
+          if (badgeEl) {
+            badgeEl.textContent = formatOtpDisplay(generateTOTP(c.secret, 0));
+          }
+        });
+      }
+    }
+
+    function generateRandomBase32(length = 16) {
+      let out = '';
+      for (let i = 0; i < length; i++) {
+        out += BASE32_ALPHABET[Math.floor(Math.random() * BASE32_ALPHABET.length)];
+      }
+      return out;
+    }
+
+    // ============================================================================
+    // 6. EVENT LISTENERS & INITIALIZATION
+    // ============================================================================
+    window.addEventListener('DOMContentLoaded', () => {
+      loadSavedState();
+      checkIncomingParameters();
+
+      // Sync config inputs
+      document.getElementById('botUsernameInput').value = state.botUsername;
+      document.getElementById('appShortNameInput').value = state.appShortName;
+      document.getElementById('hostedUrlInput').value = state.hostedUrl;
+
+      setLanguage(state.lang);
+      updateClientViewStaticFields();
+      applyPureClientModeUI();
+      renderClientsList();
+      tickTimer();
+      setInterval(tickTimer, 100);
+
+      // Top Language Switcher Buttons
+      document.querySelectorAll('[data-lang-switch]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          setLanguage(btn.getAttribute('data-lang-switch'));
+        });
+      });
+
+      // Navigation Tabs
+      document.getElementById('tabBtnClient').addEventListener('click', () => switchTab('client'));
+      document.getElementById('tabBtnGenerator').addEventListener('click', () => switchTab('generator'));
+      document.getElementById('tabBtnGuide').addEventListener('click', () => switchTab('guide'));
+
+      // Pure Client Preview Mode Toggle
+      document.getElementById('btnTogglePureClient').addEventListener('click', () => {
+        state.pureClientMode = true;
+        applyPureClientModeUI();
+      });
+      document.getElementById('btnExitClientOnly').addEventListener('click', () => {
+        state.pureClientMode = false;
+        applyPureClientModeUI();
+      });
+
+      // Copy Email / Account Label on Card Click
+      const accountCardEl = document.getElementById('accountCopyCard');
+      const copyActiveEmail = () => {
+        const emailText = (state.activeLabel || 'client.account@gmail.com').trim();
+        copyText(emailText, `${t('toastEmailCopied')}: ${emailText}`);
+      };
+      accountCardEl.addEventListener('click', copyActiveEmail);
+      accountCardEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          copyActiveEmail();
+        }
+      });
+
+      // Copy Password on Password Card Click
+      const pwdCardEl = document.getElementById('passwordCopyCard');
+      const copyActivePassword = () => {
+        const pwdText = (state.activePassword || '').trim();
+        if (pwdText) {
+          copyText(pwdText, `${t('toastPasswordCopied')}: ${pwdText}`);
+        }
+      };
+      pwdCardEl.addEventListener('click', copyActivePassword);
+      pwdCardEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          copyActivePassword();
+        }
+      });
+
+      // Copy Current 6-digit TOTP Code (Button or Circle Click)
+      const copyCurrentOtp = () => {
+        const otp = generateTOTP(state.activeSecret, 0);
+        if (otp) {
+          copyText(otp, `${t('toastCodeCopied')}: ${formatOtpDisplay(otp)}`);
+        }
+      };
+      document.getElementById('btnCopyCode').addEventListener('click', copyCurrentOtp);
+      const timerCircleEl = document.getElementById('timerCircleBox');
+      timerCircleEl.addEventListener('click', copyCurrentOtp);
+      timerCircleEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          copyCurrentOtp();
+        }
+      });
+
+      // Copy Next 6-digit TOTP Code on Pill Click
+      const nextCodePillEl = document.getElementById('nextCodeCopyPill');
+      const copyNextOtp = () => {
+        const nextOtp = generateTOTP(state.activeSecret, 1);
+        if (nextOtp) {
+          copyText(nextOtp, `${t('toastNextCodeCopied')}: ${formatOtpDisplay(nextOtp)}`);
+        }
+      };
+      nextCodePillEl.addEventListener('click', copyNextOtp);
+      nextCodePillEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          copyNextOtp();
+        }
+      });
+
+      // Toggle QR Code Panel
+      document.getElementById('btnToggleQrCode').addEventListener('click', () => {
+        const panel = document.getElementById('qrCodeContainerPanel');
+        const labelEl = document.getElementById('qrBtnLabel');
+        const isHidden = panel.classList.contains('hidden');
+        if (isHidden) {
+          renderQrCode();
+          panel.classList.remove('hidden');
+          labelEl.textContent = t('btnHideQr');
+        } else {
+          panel.classList.add('hidden');
+          labelEl.textContent = t('btnShowQr');
+        }
+      });
+
+      // Copy otpauth:// URI
+      document.getElementById('btnCopyOtpAuthUri').addEventListener('click', () => {
+        copyText(buildOtpAuthUri(), t('toastOtpUriCopied'));
+      });
+
+      // Expand/Collapse Drawer
+      document.getElementById('btnToggleKeyDrawer').addEventListener('click', () => {
+        const drawer = document.getElementById('keyDrawerContent');
+        const chevron = document.getElementById('drawerChevron');
+        const isHidden = drawer.classList.contains('hidden');
+        if (isHidden) {
+          drawer.classList.remove('hidden');
+          chevron.classList.add('rotate-180');
+        } else {
+          drawer.classList.add('hidden');
+          chevron.classList.remove('rotate-180');
+        }
+      });
+
+      // Live Manual Secret & Label Editing
+      document.getElementById('manualSecretInput').addEventListener('input', (e) => {
+        const cleaned = cleanBase32Secret(e.target.value);
+        const errEl = document.getElementById('secretErrorMsg');
+        if (isValidBase32(cleaned)) {
+          state.activeSecret = cleaned;
+          errEl.classList.add('hidden');
+          document.getElementById('activeKeyMasked').textContent = maskSecret(cleaned);
+          renderQrCode();
+          tickTimer();
+        } else {
+          errEl.classList.remove('hidden');
+        }
+      });
+
+      document.getElementById('manualLabelInput').addEventListener('input', (e) => {
+        state.activeLabel = e.target.value.trim() || 'client.account@gmail.com';
+        document.getElementById('activeAccountLabel').textContent = state.activeLabel;
+        renderQrCode();
+      });
+
+      document.getElementById('manualPasswordInput').addEventListener('input', (e) => {
+        state.activePassword = e.target.value.trim();
+        updateClientViewStaticFields();
+      });
+
+      document.getElementById('btnCopySecretKey').addEventListener('click', () => {
+        copyText(cleanBase32Secret(state.activeSecret), t('toastKeyCopied'));
+      });
+
+      // Bot Config Inputs
+      ['botUsernameInput', 'appShortNameInput', 'hostedUrlInput'].forEach(id => {
+        document.getElementById(id).addEventListener('input', () => {
+          state.botUsername = document.getElementById('botUsernameInput').value.trim();
+          state.appShortName = document.getElementById('appShortNameInput').value.trim();
+          state.hostedUrl = document.getElementById('hostedUrlInput').value.trim();
+          saveState();
+          renderClientsList();
+        });
+      });
+
+      // Random Test Secret Button
+      document.getElementById('btnGenerateRandomSecret').addEventListener('click', () => {
+        document.getElementById('newClientSecret').value = generateRandomBase32(16);
+        document.getElementById('addFormError').classList.add('hidden');
+      });
+
+      // Add Single Client Key
+      document.getElementById('btnAddClientKey').addEventListener('click', () => {
+        const labelInput = document.getElementById('newClientLabel');
+        const pwdInput = document.getElementById('newClientPassword');
+        const secretInput = document.getElementById('newClientSecret');
+        const errEl = document.getElementById('addFormError');
+
+        const cleaned = cleanBase32Secret(secretInput.value);
+        if (!isValidBase32(cleaned)) {
+          errEl.classList.remove('hidden');
+          return;
+        }
+        errEl.classList.add('hidden');
+
+        const label = labelInput.value.trim() || `client${state.clients.length + 1}@gmail.com`;
+        const password = pwdInput ? pwdInput.value.trim() : '';
+        const newClient = {
+          id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+          label,
+          password,
+          secret: cleaned
+        };
+
+        state.clients.unshift(newClient);
+        saveState();
+        renderClientsList();
+
+        labelInput.value = '';
+        if (pwdInput) pwdInput.value = '';
+        secretInput.value = '';
+        showToast(`${t('toastClientAdded')} ${label}`);
+      });
+
+      // Toggle Bulk Import Mode
+      document.getElementById('btnToggleBulkMode').addEventListener('click', (e) => {
+        const singleForm = document.getElementById('singleAddForm');
+        const bulkForm = document.getElementById('bulkAddForm');
+        if (bulkForm.classList.contains('hidden')) {
+          bulkForm.classList.remove('hidden');
+          singleForm.classList.add('hidden');
+          e.target.textContent = t('singleToggleBtn');
+        } else {
+          bulkForm.classList.add('hidden');
+          singleForm.classList.remove('hidden');
+          e.target.textContent = t('bulkToggleBtn');
+        }
+      });
+
+      // Bulk Import Action
+      document.getElementById('btnBulkImport').addEventListener('click', () => {
+        const raw = document.getElementById('bulkTextInput').value.trim();
+        if (!raw) return;
+        const lines = raw.split(/\r?\n/);
+        let added = 0;
+        lines.forEach((line, idx) => {
+          const trimmed = line.trim();
+          if (!trimmed) return;
+          let label = `client${state.clients.length + added + 1}@gmail.com`;
+          let password = '';
+          let secretPart = trimmed;
+          if (trimmed.includes('|')) {
+            const parts = trimmed.split('|').map(p => p.trim());
+            if (parts.length >= 3) {
+              label = parts[0] || label;
+              password = parts[1] || '';
+              secretPart = parts.slice(2).join('|');
+            } else {
+              label = parts[0] || label;
+              secretPart = parts[1] || '';
+            }
+          } else if (trimmed.includes(':')) {
+            const parts = trimmed.split(':').map(p => p.trim());
+            if (parts.length >= 3) {
+              label = parts[0] || label;
+              password = parts[1] || '';
+              secretPart = parts.slice(2).join(':');
+            } else {
+              label = parts[0] || label;
+              secretPart = parts[1] || '';
+            }
+          }
+          const cleaned = cleanBase32Secret(secretPart);
+          if (isValidBase32(cleaned)) {
+            state.clients.unshift({
+              id: 'c_' + Date.now() + '_' + idx + '_' + Math.random().toString(36).slice(2, 5),
+              label,
+              password,
+              secret: cleaned
+            });
+            added++;
+          }
+        });
+
+        if (added > 0) {
+          saveState();
+          renderClientsList();
+          document.getElementById('bulkTextInput').value = '';
+          showToast(`${t('toastBulkImported')} ${added}`);
+        } else {
+          showToast(t('toastBulkError'));
+        }
+      });
+
+      // Search Filter
+      document.getElementById('searchClientsInput').addEventListener('input', (e) => {
+        state.searchQuery = e.target.value;
+        renderClientsList();
+      });
+
+      // Delegate Actions on Client Cards
+      document.getElementById('clientsListContainer').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) return;
+        const action = btn.getAttribute('data-action');
+        const id = btn.getAttribute('data-id');
+        const client = state.clients.find(c => c.id === id);
+        if (!client) return;
+
+        const { tgMiniAppLink } = buildClientLinks(client);
+
+        if (action === 'copy-client-otp') {
+          const otp = generateTOTP(client.secret, 0);
+          copyText(otp, `${t('toastCodeCopied')}: ${formatOtpDisplay(otp)} (${client.label})`);
+        } else if (action === 'preview-client') {
+          state.activeSecret = client.secret;
+          state.activeLabel = client.label;
+          state.activePassword = client.password || '';
+          updateClientViewStaticFields();
+          tickTimer();
+          switchTab('client');
+          showToast(`${t('toastOpenedClient')} ${client.label}`);
+        } else if (action === 'delete-client') {
+          state.clients = state.clients.filter(c => c.id !== id);
+          saveState();
+          renderClientsList();
+          showToast(t('toastDeletedClient'));
+        } else if (action === 'copy-tg-link') {
+          copyText(tgMiniAppLink, t('toastLinkCopied'));
+        } else if (action === 'copy-client-msg') {
+          const pwdLine = client.password ? `\n${t('msgTemplatePassword')} ${client.password}\n` : '';
+          const msg =
+`${t('msgTemplateHeader')} (${client.label}):${pwdLine}
+
+${t('msgTemplateLiveLink')}
+${tgMiniAppLink}
+
+${t('msgTemplateManualKey')}
+${cleanBase32Secret(client.secret)}`;
+          copyText(msg, t('toastMsgCopied'));
+        }
+      });
+
+      // Copy Python Snippet in Guide
+      document.getElementById('btnCopyPythonCode').addEventListener('click', () => {
+        const code = document.getElementById('pythonSnippet').textContent;
+        copyText(code, t('toastPythonCopied'));
+      });
+    });
+  </script>
+</body>
+</html>
