@@ -174,6 +174,20 @@
             </div>
             <span class="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-[10px] sm:text-[11px] font-semibold text-emerald-300 shrink-0" data-i18n="tapToCopyBadge">Копировать</span>
           </div>
+
+          <!-- Mail Password Card (Shown when mail password is present; clickable to copy in 1 tap) -->
+          <div id="mailPasswordCopyCard" role="button" tabindex="0" class="group cursor-pointer bg-slate-950/70 hover:bg-slate-900/90 hover:border-indigo-500/40 active:scale-[0.99] transition-all border border-slate-800/80 rounded-2xl px-3.5 py-2 sm:px-4 sm:py-2.5 flex items-center justify-between gap-2.5" title="Нажмите, чтобы скопировать пароль от почты">
+            <div class="min-w-0">
+              <div class="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
+                <span data-i18n="mailPasswordForLogin">Пароль от почты</span>
+                <svg class="w-3 h-3 text-slate-500 group-hover:text-indigo-400 transition-colors shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                </svg>
+              </div>
+              <div id="activeMailPassword" class="text-xs sm:text-sm font-mono font-bold text-indigo-300 group-hover:text-indigo-200 transition-colors truncate select-all">ccmsowawf1</div>
+            </div>
+            <span class="px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/25 text-[10px] sm:text-[11px] font-semibold text-indigo-300 shrink-0" data-i18n="tapToCopyBadge">Копировать</span>
+          </div>
         </div>
 
         <!-- Main Code + Circular Countdown Ring (Mobile-adapted size & tighter code spacing so digits stay well inside) -->
@@ -270,6 +284,64 @@
 
     <!-- ==================== VIEW 2: MULTI-CLIENT LINK GENERATOR ==================== -->
     <section id="viewGenerator" class="hidden space-y-6">
+
+      <!-- SMART ACCOUNT TEXT PARSER, TRANSLATOR & LINK INTEGRATOR -->
+      <div class="bg-slate-900/95 border border-sky-500/40 rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+          <div>
+            <h2 class="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span>
+              <span data-i18n="smartParserTitle">⚡ Авто-редактор текста для клиента (Вставьте данные аккаунта)</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5" data-i18n="smartParserSub">
+              Вставьте ваш исходный текст (PlayStation / почта / 2FA): сайт сам переведет поля на выбранный сверху язык (RU / UA / EN) и встроит персональную ссылку прямо в ключ!
+            </p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <!-- Left: Raw Text Input -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <label for="rawAccountDumpInput" class="text-xs font-semibold text-slate-300" data-i18n="rawInputLabel">1. Вставьте исходный текст аккаунта:</label>
+              <button id="btnClearRawInput" type="button" class="text-[11px] text-slate-400 hover:text-white underline" data-i18n="btnClearText">Очистить</button>
+            </div>
+            <textarea id="rawAccountDumpInput" rows="7" class="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 focus:border-sky-500 focus:outline-none text-xs font-mono text-slate-200 leading-relaxed">Playstation login email: irishtashay679@outlook.com
+Playstation login password: 3DnPYAEy
+Mail password: ccmsowawf1
+Date of Birth: 16.11.1999
+2FA (Google): D7I6FOZKVSQLANIUO4C77PKLDBIGL3SWEQBNTJSPCEOXF6JJZUJJSEI2JDVH5CCZUNGPCRX6QKIS7VQLPVFGK3ZOTOOPH6R2H5BTTCA
+2FA backup codes: aZeYMj, mc9Z7T, NUkMsz, H7zDXr, eDWLBx, Xs5nZC, c3ZbZe, f4JY4T, UM2fjz, cUdFc7</textarea>
+          </div>
+
+          <!-- Right: Live Translated & Link-Integrated Output -->
+          <div class="space-y-2.5 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-xs font-semibold text-emerald-400" data-i18n="formattedOutputLabel">2. Готовый текст (ключ = кликабельная ссылка):</span>
+                <label class="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer select-none">
+                  <input id="chkAppendExplicitLink" type="checkbox" class="rounded border-slate-700 bg-slate-900 text-sky-500 focus:ring-0" />
+                  <span data-i18n="chkExplicitLinkLabel">+ строка со ссылкой</span>
+                </label>
+              </div>
+              <div id="smartFormattedPreview" class="w-full min-h-[148px] p-3 rounded-xl bg-slate-950 border border-emerald-500/30 text-xs text-slate-100 leading-relaxed whitespace-pre-wrap break-all select-all"></div>
+            </div>
+
+            <!-- Copy & Save Action Buttons -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <button id="btnCopyRichTelegram" type="button" class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-sky-500/20 transition-all flex items-center justify-center gap-1.5">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                </svg>
+                <span data-i18n="btnCopyRichText">Скопировать для Telegram (ключ-ссылка)</span>
+              </button>
+              <button id="btnSaveParsedToClientView" type="button" class="py-2.5 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-semibold text-xs transition-all flex items-center justify-center gap-1.5">
+                <span data-i18n="btnApplyParsed">Открыть этот аккаунт на экране клиента</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- How Dynamic Keys Work Banner -->
       <div class="bg-gradient-to-r from-sky-500/10 via-indigo-500/10 to-slate-900 border border-sky-500/30 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -458,7 +530,7 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
     // ============================================================================
     const I18N = {
       uk: {
-        pureClientBanner: 'Ви переглядаєте чистий інтерфейс клієнта.',
+        pureClientBanner: '🔧 Попередній перегляд (у клієнта за посиланням цієї кнопки немає).',
         pureClientExit: 'Повернути панель керування',
         headerSubtitle: 'Один файл для необмеженої кількості ключів та клієнтів',
         tabClient: 'Екран клієнта',
@@ -467,6 +539,24 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
         btnClientPreview: 'Вигляд клієнта',
         accountForLogin: 'Акаунт для входу',
         passwordForLogin: 'Пароль від акаунта',
+        mailPasswordForLogin: 'Пароль від пошти',
+        toastMailPasswordCopied: 'Пароль від пошти скопійовано',
+        smartParserTitle: '⚡ Авто-редактор тексту для клієнта (Вставте дані акаунта)',
+        smartParserSub: 'Вставте ваш вихідний текст (PlayStation / пошта / 2FA): сайт сам перекладе поля обраною зверху мовою (RU / UA / EN) і вбудує персональне посилання прямо в ключ!',
+        rawInputLabel: '1. Вставте вихідний текст акаунта:',
+        btnClearText: 'Очистити',
+        formattedOutputLabel: '2. Готовий текст (ключ = клікабельне посилання):',
+        chkExplicitLinkLabel: '+ рядок із посиланням',
+        btnCopyRichText: 'Скопіювати для Telegram (ключ-посилання)',
+        btnApplyParsed: 'Відкрити цей акаунт на екрані клієнта',
+        toastRichCopied: 'Готовий текст із вшитим у ключ посиланням скопійовано!',
+        lblPsEmail: 'Пошта для входу PlayStation',
+        lblPsPassword: 'Пароль для входу PlayStation',
+        lblMailPassword: 'Пароль від пошти',
+        lblDob: 'Дата народження',
+        lbl2faGoogle: '2FA (Google — натисніть на ключ для живого коду)',
+        lblBackupCodes: 'Резервні коди 2FA',
+        lblLive2faLine: 'Живий 2FA-код у Telegram',
         tapToCopyBadge: 'Копіювати',
         accountPasswordInputLabel: 'Пароль від акаунта (необов’язково)',
         newClientPasswordLabel: 'Пароль від акаунта (необов’язково)',
@@ -545,7 +635,7 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
         msgTemplateManualKey: '🔑 Ключ для ручного додавання у ваш Google Authenticator:'
       },
       ru: {
-        pureClientBanner: 'Вы просматриваете чистый интерфейс клиента.',
+        pureClientBanner: '🔧 Предпросмотр для вас (у клиента по ссылке этой кнопки нет).',
         pureClientExit: 'Вернуть панель',
         headerSubtitle: 'Один файл для неограниченного количества ключей и клиентов',
         tabClient: 'Экран клиента',
@@ -554,6 +644,24 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
         btnClientPreview: 'Вид клиента',
         accountForLogin: 'Аккаунт для входа',
         passwordForLogin: 'Пароль от аккаунта',
+        mailPasswordForLogin: 'Пароль от почты',
+        toastMailPasswordCopied: 'Пароль от почты скопирован',
+        smartParserTitle: '⚡ Авто-редактор текста для клиента (Вставьте данные аккаунта)',
+        smartParserSub: 'Вставьте ваш исходный текст (PlayStation / почта / 2FA): сайт сам переведет поля на выбранный сверху язык (RU / UA / EN) и встроит персональную ссылку прямо в ключ!',
+        rawInputLabel: '1. Вставьте исходный текст аккаунта:',
+        btnClearText: 'Очистить',
+        formattedOutputLabel: '2. Готовый текст (ключ = кликабельная ссылка):',
+        chkExplicitLinkLabel: '+ строка со ссылкой',
+        btnCopyRichText: 'Скопировать для Telegram (ключ-ссылка)',
+        btnApplyParsed: 'Открыть этот аккаунт на экране клиента',
+        toastRichCopied: 'Готовый текст с вшитой в ключ ссылкой скопирован!',
+        lblPsEmail: 'Почта для входа PlayStation',
+        lblPsPassword: 'Пароль для входа PlayStation',
+        lblMailPassword: 'Пароль от почты',
+        lblDob: 'Дата рождения',
+        lbl2faGoogle: '2FA (Google — нажмите на ключ для живого кода)',
+        lblBackupCodes: 'Резервные коды 2FA',
+        lblLive2faLine: 'Живой 2FA-код в Telegram',
         tapToCopyBadge: 'Копировать',
         accountPasswordInputLabel: 'Пароль от аккаунта (необязательно)',
         newClientPasswordLabel: 'Пароль от аккаунта (необязательно)',
@@ -632,7 +740,7 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
         msgTemplateManualKey: '🔑 Ключ для ручного добавления в ваш Google Authenticator:'
       },
       en: {
-        pureClientBanner: 'You are viewing the clean client interface.',
+        pureClientBanner: '🔧 Admin preview (clients opening your link do not see this bar).',
         pureClientExit: 'Show Admin Bar',
         headerSubtitle: 'Single file for unlimited 2FA keys and clients',
         tabClient: 'Client View',
@@ -641,6 +749,24 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
         btnClientPreview: 'Client Preview',
         accountForLogin: 'Account for login',
         passwordForLogin: 'Account password',
+        mailPasswordForLogin: 'Mail password',
+        toastMailPasswordCopied: 'Mail password copied',
+        smartParserTitle: '⚡ Smart Client Text Formatter (Paste account details)',
+        smartParserSub: 'Paste your raw account text (PlayStation / email / 2FA): the app translates all labels into the selected language (RU / UA / EN) and embeds the personal link right into the 2FA key!',
+        rawInputLabel: '1. Paste raw account text:',
+        btnClearText: 'Clear',
+        formattedOutputLabel: '2. Ready message (key = clickable link):',
+        chkExplicitLinkLabel: '+ explicit link line',
+        btnCopyRichText: 'Copy for Telegram (linked key)',
+        btnApplyParsed: 'Open this account on Client Screen',
+        toastRichCopied: 'Formatted text with linked 2FA key copied!',
+        lblPsEmail: 'PlayStation login email',
+        lblPsPassword: 'PlayStation login password',
+        lblMailPassword: 'Mail password',
+        lblDob: 'Date of Birth',
+        lbl2faGoogle: '2FA (Google — tap key for live code)',
+        lblBackupCodes: '2FA backup codes',
+        lblLive2faLine: 'Live 2FA code in Telegram',
         tapToCopyBadge: 'Copy',
         accountPasswordInputLabel: 'Account password (optional)',
         newClientPasswordLabel: 'Account password (optional)',
@@ -881,11 +1007,13 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
       return cleaned.slice(0, 4) + ' •••• ' + cleaned.slice(-4);
     }
 
-    function encodeStartAppParam(secret, label, password = '') {
+    function encodeStartAppParam(secret, label, password = '', mailPassword = '') {
       const cleaned = cleanBase32Secret(secret);
-      if (!label && !password) return cleaned;
+      if (!label && !password && !mailPassword) return cleaned;
       try {
-        const combined = password ? `${(label || '').slice(0, 40)}\n${password.slice(0, 40)}` : (label || '').slice(0, 40);
+        const parts = [(label || '').trim(), (password || '').trim(), (mailPassword || '').trim()];
+        while (parts.length > 0 && !parts[parts.length - 1]) parts.pop();
+        const combined = parts.join('||');
         const bytes = new TextEncoder().encode(combined);
         let bin = '';
         bytes.forEach(b => bin += String.fromCharCode(b));
@@ -898,44 +1026,66 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
 
     function decodeStartAppParam(param) {
       if (!param) return null;
-      const parts = String(param).split('__');
-      const secret = cleanBase32Secret(parts[0]);
+      const strParam = String(param).trim();
+      const splitIdx = strParam.indexOf('__');
+      const secretPart = splitIdx === -1 ? strParam : strParam.slice(0, splitIdx);
+      const encodedPart = splitIdx === -1 ? '' : strParam.slice(splitIdx + 2);
+      const secret = cleanBase32Secret(secretPart);
       if (!isValidBase32(secret)) return null;
-      let label = 'client.account@gmail.com';
+      let label = 'irishtashay679@outlook.com';
       let password = '';
-      if (parts[1]) {
+      let mailPassword = '';
+      if (encodedPart) {
         try {
-          const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+          let b64 = encodedPart.replace(/-/g, '+').replace(/_/g, '/');
+          while (b64.length % 4 !== 0) {
+            b64 += '=';
+          }
           const bin = atob(b64);
           const bytes = new Uint8Array(bin.length);
           for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
           const decodedStr = new TextDecoder().decode(bytes);
-          const lines = decodedStr.split('\n');
-          label = lines[0] || 'client.account@gmail.com';
-          password = lines.slice(1).join('\n') || '';
+          if (decodedStr.includes('||')) {
+            const p = decodedStr.split('||');
+            label = p[0] || 'irishtashay679@outlook.com';
+            password = p[1] || '';
+            mailPassword = p[2] || '';
+          } else {
+            const lines = decodedStr.split(/\r?\n/);
+            label = lines[0] || 'irishtashay679@outlook.com';
+            password = lines.slice(1).join('') || '';
+          }
         } catch (e) {
-          label = 'client.account@gmail.com';
+          label = 'irishtashay679@outlook.com';
         }
       }
-      return { secret, label, password };
+      return { secret, label, password, mailPassword };
     }
 
     // ============================================================================
     // 3. APPLICATION STATE & STORAGE
     // ============================================================================
     const DEFAULT_CLIENTS = [
-      { id: 'c1', label: 'client.account@gmail.com', password: 'Pass_2026!x9', secret: 'JBSWY3DPEHPK3PXP' },
-      { id: 'c2', label: 'user.login24@gmail.com', password: 'Steam_Login#44', secret: 'GEZDGNBVGY3TQOJQ' },
-      { id: 'c3', label: 'pro.access09@gmail.com', password: '', secret: 'MFRGGZDFMZTWQ2LK' }
+      {
+        id: 'c1',
+        label: 'irishtashay679@outlook.com',
+        password: '3DnPYAEy',
+        mailPassword: 'ccmsowawf1',
+        secret: 'D7I6FOZKVSQLANIUO4C77PKLDBIGL3SWEQBNTJSPCEOXF6JJZUJJSEI2JDVH5CCZUNGPCRX6QKIS7VQLPVFGK3ZOTOOPH6R2H5BTTCA'
+      },
+      { id: 'c2', label: 'user.login24@gmail.com', password: 'Steam_Login#44', mailPassword: '', secret: 'GEZDGNBVGY3TQOJQ' },
+      { id: 'c3', label: 'pro.access09@gmail.com', password: '', mailPassword: '', secret: 'MFRGGZDFMZTWQ2LK' }
     ];
 
     const state = {
       lang: 'ru', // 'ru' (default) | 'uk' | 'en'
       activeTab: 'client', // 'client' | 'generator' | 'guide'
       pureClientMode: false,
-      activeSecret: 'JBSWY3DPEHPK3PXP',
-      activeLabel: 'client.account@gmail.com',
-      activePassword: 'Pass_2026!x9',
+      isLockedClient: false, // true when opened by a client via ?startapp= or ?secret= (hides all admin buttons)
+      activeSecret: 'D7I6FOZKVSQLANIUO4C77PKLDBIGL3SWEQBNTJSPCEOXF6JJZUJJSEI2JDVH5CCZUNGPCRX6QKIS7VQLPVFGK3ZOTOOPH6R2H5BTTCA',
+      activeLabel: 'irishtashay679@outlook.com',
+      activePassword: '3DnPYAEy',
+      activeMailPassword: 'ccmsowawf1',
       botUsername: 'my_auth2fa_bot',
       appShortName: 'totp',
       hostedUrl: 'https://my-shop.github.io/2fa/',
@@ -996,16 +1146,19 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
 
       saveState();
       renderClientsList();
+      if (typeof renderSmartParserPreview === 'function') {
+        renderSmartParserPreview();
+      }
     }
 
     function loadSavedState() {
       try {
-        const savedClients = localStorage.getItem('tg_2fa_clients_v4');
+        const savedClients = localStorage.getItem('tg_2fa_clients_v6');
         if (savedClients) {
           const parsed = JSON.parse(savedClients);
           if (Array.isArray(parsed) && parsed.length > 0) state.clients = parsed;
         }
-        const savedConfig = localStorage.getItem('tg_2fa_config_v4');
+        const savedConfig = localStorage.getItem('tg_2fa_config_v6');
         if (savedConfig) {
           const cfg = JSON.parse(savedConfig);
           if (cfg.botUsername) state.botUsername = cfg.botUsername;
@@ -1020,8 +1173,8 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
 
     function saveState() {
       try {
-        localStorage.setItem('tg_2fa_clients_v4', JSON.stringify(state.clients));
-        localStorage.setItem('tg_2fa_config_v4', JSON.stringify({
+        localStorage.setItem('tg_2fa_clients_v6', JSON.stringify(state.clients));
+        localStorage.setItem('tg_2fa_config_v6', JSON.stringify({
           botUsername: state.botUsername,
           appShortName: state.appShortName,
           hostedUrl: state.hostedUrl,
@@ -1051,25 +1204,31 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
         params.get('tgWebAppStartParam') ||
         params.get('startapp');
 
-      if (tgStartParam) {
-        const decoded = decodeStartAppParam(tgStartParam);
+      // Also check window.location.hash in case Telegram passes #tgWebAppData or start_param in hash
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      const effectiveStartParam = tgStartParam || hashParams.get('tgWebAppStartParam') || hashParams.get('startapp');
+
+      if (effectiveStartParam) {
+        const decoded = decodeStartAppParam(effectiveStartParam);
         if (decoded) {
           state.activeSecret = decoded.secret;
           state.activeLabel = decoded.label;
           state.activePassword = decoded.password || '';
+          state.activeMailPassword = decoded.mailPassword || '';
           state.pureClientMode = true;
+          state.isLockedClient = true;
           return;
         }
       }
 
-      const urlSecret = params.get('secret') || params.get('key');
+      const urlSecret = params.get('secret') || params.get('key') || hashParams.get('secret');
       if (urlSecret && isValidBase32(cleanBase32Secret(urlSecret))) {
         state.activeSecret = cleanBase32Secret(urlSecret);
-        state.activeLabel = params.get('label') || 'client.account@gmail.com';
-        state.activePassword = params.get('pwd') || params.get('password') || '';
-        if (params.get('mode') === 'client') {
-          state.pureClientMode = true;
-        }
+        state.activeLabel = params.get('label') || hashParams.get('label') || 'irishtashay679@outlook.com';
+        state.activePassword = params.get('pwd') || params.get('password') || hashParams.get('pwd') || '';
+        state.activeMailPassword = params.get('mpwd') || hashParams.get('mpwd') || '';
+        state.pureClientMode = true;
+        state.isLockedClient = (params.get('admin') !== '1');
       }
     }
 
@@ -1151,15 +1310,28 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
       const header = document.getElementById('adminHeader');
       const banner = document.getElementById('clientOnlyBanner');
       const toggleBtn = document.getElementById('btnTogglePureClient');
-      if (state.pureClientMode) {
+      const drawerSection = document.getElementById('btnToggleKeyDrawer') ? document.getElementById('btnToggleKeyDrawer').parentElement : null;
+
+      if (state.isLockedClient) {
+        // Real client opened a personal link: completely hide Admin Header, "Вернуть панель" banner, "Вид клиента" button, and key edit drawer
+        header.classList.add('hidden');
+        banner.classList.add('hidden');
+        toggleBtn.classList.add('hidden');
+        if (drawerSection) drawerSection.classList.add('hidden');
+        switchTab('client');
+      } else if (state.pureClientMode) {
+        // Admin is previewing how the client screen looks
         header.classList.add('hidden');
         banner.classList.remove('hidden');
         toggleBtn.classList.add('hidden');
+        if (drawerSection) drawerSection.classList.add('hidden');
         switchTab('client');
       } else {
+        // Full Admin Panel mode
         header.classList.remove('hidden');
         banner.classList.add('hidden');
         toggleBtn.classList.remove('hidden');
+        if (drawerSection) drawerSection.classList.remove('hidden');
       }
     }
 
@@ -1205,6 +1377,17 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
         pwdCard.classList.add('hidden');
         pwdText.textContent = '';
       }
+      const mailPwdCard = document.getElementById('mailPasswordCopyCard');
+      const mailPwdText = document.getElementById('activeMailPassword');
+      if (mailPwdCard && mailPwdText) {
+        if (state.activeMailPassword && state.activeMailPassword.trim()) {
+          mailPwdCard.classList.remove('hidden');
+          mailPwdText.textContent = state.activeMailPassword.trim();
+        } else {
+          mailPwdCard.classList.add('hidden');
+          mailPwdText.textContent = '';
+        }
+      }
       const secretInput = document.getElementById('manualSecretInput');
       const labelInput = document.getElementById('manualLabelInput');
       const pwdInput = document.getElementById('manualPasswordInput');
@@ -1218,7 +1401,7 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
       const bot = (state.botUsername || 'my_auth2fa_bot').replace(/^@/, '').trim();
       const shortName = (state.appShortName || 'totp').trim();
       const baseHost = (state.hostedUrl || 'https://my-shop.github.io/2fa/').trim();
-      const startParam = encodeStartAppParam(client.secret, client.label, client.password || '');
+      const startParam = encodeStartAppParam(client.secret, client.label, client.password || '', client.mailPassword || '');
 
       const tgMiniAppLink = `https://t.me/${bot}/${shortName}?startapp=${startParam}`;
       const sep = baseHost.includes('?') ? '&' : '?';
@@ -1368,6 +1551,171 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
     }
 
     // ============================================================================
+    // SMART ACCOUNT TEXT PARSER, TRANSLATOR & LINK INTEGRATOR
+    // ============================================================================
+    function parseRawAccountText(rawText) {
+      const lines = String(rawText || '').split(/\r?\n/);
+      const parsed = {
+        email: '',
+        password: '',
+        mailPassword: '',
+        dob: '',
+        secret: '',
+        backupCodes: '',
+        extraLines: []
+      };
+
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+        const colonIdx = trimmed.indexOf(':');
+        if (colonIdx === -1) {
+          // Check if standalone Base32 key
+          const maybeKey = cleanBase32Secret(trimmed);
+          if (!parsed.secret && maybeKey.length >= 16 && isValidBase32(maybeKey)) {
+            parsed.secret = maybeKey;
+          } else {
+            parsed.extraLines.push(trimmed);
+          }
+          return;
+        }
+
+        const keyRaw = trimmed.slice(0, colonIdx).trim().toLowerCase();
+        const val = trimmed.slice(colonIdx + 1).trim();
+
+        if (keyRaw.includes('login email') || keyRaw.includes('psn email') || keyRaw === 'email' || keyRaw.includes('почта для входа') || keyRaw.includes('пошта для входу')) {
+          parsed.email = val;
+        } else if (keyRaw.includes('login password') || keyRaw.includes('psn password') || keyRaw === 'password' || keyRaw.includes('пароль для входа') || keyRaw.includes('пароль для входу')) {
+          parsed.password = val;
+        } else if (keyRaw.includes('mail password') || keyRaw.includes('email password') || keyRaw.includes('пароль от почты') || keyRaw.includes('пароль від пошти')) {
+          parsed.mailPassword = val;
+        } else if (keyRaw.includes('birth') || keyRaw.includes('dob') || keyRaw.includes('дата рождения') || keyRaw.includes('дата народження')) {
+          parsed.dob = val;
+        } else if (keyRaw.includes('backup') || keyRaw.includes('резервн')) {
+          parsed.backupCodes = val;
+        } else if (keyRaw.includes('2fa') || keyRaw.includes('authenticator') || keyRaw.includes('totp')) {
+          const cleaned = cleanBase32Secret(val);
+          if (isValidBase32(cleaned)) {
+            parsed.secret = cleaned;
+          } else {
+            parsed.extraLines.push(trimmed);
+          }
+        } else {
+          parsed.extraLines.push(trimmed);
+        }
+      });
+
+      return parsed;
+    }
+
+    function buildSmartFormattedOutput() {
+      const inputEl = document.getElementById('rawAccountDumpInput');
+      const chkExplicit = document.getElementById('chkAppendExplicitLink');
+      if (!inputEl) return { html: '', plain: '', parsed: null, link: '' };
+
+      const parsed = parseRawAccountText(inputEl.value);
+      const bot = (state.botUsername || 'my_auth2fa_bot').replace(/^@/, '').trim();
+      const shortName = (state.appShortName || 'totp').trim();
+
+      let tgLink = '';
+      if (parsed.secret) {
+        const startParam = encodeStartAppParam(
+          parsed.secret,
+          parsed.email || 'client.account@gmail.com',
+          parsed.password || '',
+          parsed.mailPassword || ''
+        );
+        tgLink = `https://t.me/${bot}/${shortName}?startapp=${startParam}`;
+      }
+
+      const htmlLines = [];
+      const plainLines = [];
+
+      if (parsed.email) {
+        htmlLines.push(`<b>${escapeHtml(t('lblPsEmail'))}:</b> <code>${escapeHtml(parsed.email)}</code>`);
+        plainLines.push(`${t('lblPsEmail')}: ${parsed.email}`);
+      }
+      if (parsed.password) {
+        htmlLines.push(`<b>${escapeHtml(t('lblPsPassword'))}:</b> <code>${escapeHtml(parsed.password)}</code>`);
+        plainLines.push(`${t('lblPsPassword')}: ${parsed.password}`);
+      }
+      if (parsed.mailPassword) {
+        htmlLines.push(`<b>${escapeHtml(t('lblMailPassword'))}:</b> <code>${escapeHtml(parsed.mailPassword)}</code>`);
+        plainLines.push(`${t('lblMailPassword')}: ${parsed.mailPassword}`);
+      }
+      if (parsed.dob) {
+        htmlLines.push(`<b>${escapeHtml(t('lblDob'))}:</b> ${escapeHtml(parsed.dob)}`);
+        plainLines.push(`${t('lblDob')}: ${parsed.dob}`);
+      }
+      if (parsed.secret) {
+        // Make the 2FA key itself a clickable link in HTML!
+        htmlLines.push(`<b>${escapeHtml(t('lbl2faGoogle'))}:</b> <a href="${escapeHtml(tgLink)}" target="_blank" rel="noopener noreferrer" class="text-sky-400 underline font-mono font-bold">${escapeHtml(parsed.secret)}</a>`);
+        if (chkExplicit && chkExplicit.checked) {
+          htmlLines.push(`🔗 <b>${escapeHtml(t('lblLive2faLine'))}:</b> <a href="${escapeHtml(tgLink)}" target="_blank" rel="noopener noreferrer" class="text-emerald-400 underline">${escapeHtml(tgLink)}</a>`);
+          plainLines.push(`${t('lbl2faGoogle')}: ${parsed.secret}`);
+          plainLines.push(`🔗 ${t('lblLive2faLine')}: ${tgLink}`);
+        } else {
+          // In plain text fallback, include the link right next to or on the key so it's never lost
+          plainLines.push(`${t('lbl2faGoogle')}: ${tgLink}`);
+          plainLines.push(`(${parsed.secret})`);
+        }
+      }
+      if (parsed.backupCodes) {
+        htmlLines.push(`<b>${escapeHtml(t('lblBackupCodes'))}:</b> <code>${escapeHtml(parsed.backupCodes)}</code>`);
+        plainLines.push(`${t('lblBackupCodes')}: ${parsed.backupCodes}`);
+      }
+      parsed.extraLines.forEach(line => {
+        htmlLines.push(escapeHtml(line));
+        plainLines.push(line);
+      });
+
+      return {
+        html: htmlLines.join('<br>'),
+        plain: plainLines.join('\n'),
+        parsed,
+        link: tgLink
+      };
+    }
+
+    function renderSmartParserPreview() {
+      const previewEl = document.getElementById('smartFormattedPreview');
+      if (!previewEl) return;
+      const { html } = buildSmartFormattedOutput();
+      previewEl.innerHTML = html || '<span class="text-slate-500">...</span>';
+    }
+
+    function copyRichTelegramMessage() {
+      const { html, plain } = buildSmartFormattedOutput();
+      if (!plain) return;
+
+      // Clean HTML for Telegram clipboard (only <b>, <code>, <a href="...">, and newlines)
+      const telegramCleanHtml = html
+        .replace(/ class="[^"]*"/g, '')
+        .replace(/ target="_blank"/g, '')
+        .replace(/ rel="noopener noreferrer"/g, '');
+
+      if (navigator.clipboard && window.ClipboardItem) {
+        try {
+          const htmlBlob = new Blob([telegramCleanHtml], { type: 'text/html' });
+          const textBlob = new Blob([plain], { type: 'text/plain' });
+          const item = new ClipboardItem({
+            'text/html': htmlBlob,
+            'text/plain': textBlob
+          });
+          navigator.clipboard.write([item]).then(() => {
+            showToast(t('toastRichCopied'));
+          }).catch(() => {
+            copyText(plain, t('toastRichCopied'));
+          });
+          return;
+        } catch (e) {
+          // Fallback below
+        }
+      }
+      copyText(plain, t('toastRichCopied'));
+    }
+
+    // ============================================================================
     // 6. EVENT LISTENERS & INITIALIZATION
     // ============================================================================
     window.addEventListener('DOMContentLoaded', () => {
@@ -1437,6 +1785,87 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
           copyActivePassword();
         }
       });
+
+      // Copy Mail Password on Mail Password Card Click
+      const mailPwdCardEl = document.getElementById('mailPasswordCopyCard');
+      const copyActiveMailPassword = () => {
+        const mpwd = (state.activeMailPassword || '').trim();
+        if (mpwd) {
+          copyText(mpwd, `${t('toastMailPasswordCopied')}: ${mpwd}`);
+        }
+      };
+      if (mailPwdCardEl) {
+        mailPwdCardEl.addEventListener('click', copyActiveMailPassword);
+        mailPwdCardEl.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            copyActiveMailPassword();
+          }
+        });
+      }
+
+      // Smart Account Parser Listeners
+      const rawDumpInput = document.getElementById('rawAccountDumpInput');
+      const chkExplicit = document.getElementById('chkAppendExplicitLink');
+      if (rawDumpInput) {
+        renderSmartParserPreview();
+        rawDumpInput.addEventListener('input', () => {
+          renderSmartParserPreview();
+          const { parsed } = buildSmartFormattedOutput();
+          if (parsed && parsed.secret) {
+            state.activeSecret = parsed.secret;
+            state.activeLabel = parsed.email || 'irishtashay679@outlook.com';
+            state.activePassword = parsed.password || '';
+            state.activeMailPassword = parsed.mailPassword || '';
+            updateClientViewStaticFields();
+            tickTimer();
+          }
+        });
+      }
+      if (chkExplicit) {
+        chkExplicit.addEventListener('change', renderSmartParserPreview);
+      }
+      const btnClearRaw = document.getElementById('btnClearRawInput');
+      if (btnClearRaw && rawDumpInput) {
+        btnClearRaw.addEventListener('click', () => {
+          rawDumpInput.value = '';
+          renderSmartParserPreview();
+        });
+      }
+      const btnCopyRich = document.getElementById('btnCopyRichTelegram');
+      if (btnCopyRich) {
+        btnCopyRich.addEventListener('click', copyRichTelegramMessage);
+      }
+      const btnApplyParsed = document.getElementById('btnSaveParsedToClientView');
+      if (btnApplyParsed) {
+        btnApplyParsed.addEventListener('click', () => {
+          const { parsed } = buildSmartFormattedOutput();
+          if (parsed && parsed.secret) {
+            state.activeSecret = parsed.secret;
+            state.activeLabel = parsed.email || 'irishtashay679@outlook.com';
+            state.activePassword = parsed.password || '';
+            state.activeMailPassword = parsed.mailPassword || '';
+            // Also save to clients list if not already top item
+            if (!state.clients.some(c => c.secret === parsed.secret && c.label === state.activeLabel)) {
+              state.clients.unshift({
+                id: 'c_' + Date.now(),
+                label: state.activeLabel,
+                password: state.activePassword,
+                mailPassword: state.activeMailPassword,
+                secret: parsed.secret
+              });
+              saveState();
+              renderClientsList();
+            }
+            updateClientViewStaticFields();
+            tickTimer();
+            switchTab('client');
+            showToast(`${t('toastOpenedClient')} ${state.activeLabel}`);
+          } else {
+            showToast(t('toastBulkError'));
+          }
+        });
+      }
 
       // Copy Current 6-digit TOTP Code (Button or Circle Click)
       const copyCurrentOtp = () => {
@@ -1543,6 +1972,7 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
           state.hostedUrl = document.getElementById('hostedUrlInput').value.trim();
           saveState();
           renderClientsList();
+          renderSmartParserPreview();
         });
       });
 
@@ -1576,7 +2006,11 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
         };
 
         state.clients.unshift(newClient);
+        state.activeSecret = newClient.secret;
+        state.activeLabel = newClient.label;
+        state.activePassword = newClient.password || '';
         saveState();
+        updateClientViewStaticFields();
         renderClientsList();
 
         labelInput.value = '';
