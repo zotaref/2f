@@ -288,17 +288,26 @@
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <!-- Left: Raw Text Input -->
-          <div class="space-y-2">
-            <div class="flex items-center justify-between">
-              <label for="rawAccountDumpInput" class="text-xs font-semibold text-slate-300" data-i18n="rawInputLabel">1. Вставьте исходный текст аккаунта:</label>
-              <button id="btnClearRawInput" type="button" class="text-[11px] text-slate-400 hover:text-white underline" data-i18n="btnClearText">Очистить</button>
-            </div>
-            <textarea id="rawAccountDumpInput" rows="7" class="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 focus:border-sky-500 focus:outline-none text-xs font-mono text-slate-200 leading-relaxed">Playstation login email: irishtashay679@outlook.com
+          <!-- Left: Raw Text Input + Generate Button -->
+          <div class="space-y-2.5 flex flex-col justify-between">
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <label for="rawAccountDumpInput" class="text-xs font-semibold text-slate-300" data-i18n="rawInputLabel">1. Вставьте исходный текст аккаунта:</label>
+                <button id="btnClearRawInput" type="button" class="text-[11px] text-slate-400 hover:text-white underline" data-i18n="btnClearText">Очистить</button>
+              </div>
+              <textarea id="rawAccountDumpInput" rows="7" class="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 focus:border-sky-500 focus:outline-none text-xs font-mono text-slate-200 leading-relaxed">Playstation login email: irishtashay679@outlook.com
 Playstation login password: 3DnPYAEy
+Mail password: ccmsowawf1
 Date of Birth: 16.11.1999
 2FA (Google): D7I6FOZKVSQLANIUO4C77PKLDBIGL3SWEQBNTJSPCEOXF6JJZUJJSEI2JDVH5CCZUNGPCRX6QKIS7VQLPVFGK3ZOTOOPH6R2H5BTTCA
 2FA backup codes: aZeYMj, mc9Z7T, NUkMsz, H7zDXr, eDWLBx, Xs5nZC, c3ZbZe, f4JY4T, UM2fjz, cUdFc7</textarea>
+            </div>
+            <button id="btnGenerateClientAndText" type="button" class="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-[0.99] text-slate-950 font-bold text-xs sm:text-sm shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2">
+              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+              </svg>
+              <span data-i18n="btnGenerateText">Сгенерировать текст (добавить клиента + вшить ссылку)</span>
+            </button>
           </div>
 
           <!-- Right: Live Translated & Link-Integrated Output -->
@@ -537,12 +546,14 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
         btnCopyRichText: 'Скопіювати для Telegram (ключ-посилання)',
         btnApplyParsed: 'Відкрити цей акаунт на екрані клієнта',
         toastRichCopied: 'Готовий текст із вшитим у ключ посиланням скопійовано!',
-        lblPsEmail: 'Пошта для входу PlayStation',
-        lblPsPassword: 'Пароль для входу PlayStation',
+        btnGenerateText: 'Згенерувати текст (додати клієнта + вшити посилання)',
+        toastGeneratedSuccess: 'Клієнта додано, посилання на Mini App вшито в ключ!',
+        lblPsEmail: 'PlayStation логін',
+        lblPsPassword: 'PlayStation пароль',
         lblMailPassword: 'Пароль від пошти',
         lblDob: 'Дата народження',
-        lbl2faGoogle: '2FA (Google)',
-        lblBackupCodes: 'Резервні коди 2FA',
+        lbl2faGoogle: '2FA ключ',
+        lblBackupCodes: 'Одноразові коди',
         lblLive2faLine: 'Живий 2FA-код у Telegram',
         tapToCopyBadge: 'Копіювати',
         accountPasswordInputLabel: 'Пароль від акаунта (необов’язково)',
@@ -642,12 +653,14 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
         btnCopyRichText: 'Скопировать для Telegram (ключ-ссылка)',
         btnApplyParsed: 'Открыть этот аккаунт на экране клиента',
         toastRichCopied: 'Готовый текст с вшитой в ключ ссылкой скопирован!',
-        lblPsEmail: 'Почта для входа PlayStation',
-        lblPsPassword: 'Пароль для входа PlayStation',
+        btnGenerateText: 'Сгенерировать текст (добавить клиента + вшить ссылку)',
+        toastGeneratedSuccess: 'Клиент добавлен, ссылка на Mini App вшита в ключ!',
+        lblPsEmail: 'PlayStation логин',
+        lblPsPassword: 'PlayStation пароль',
         lblMailPassword: 'Пароль от почты',
         lblDob: 'Дата рождения',
-        lbl2faGoogle: '2FA (Google)',
-        lblBackupCodes: 'Резервные коды 2FA',
+        lbl2faGoogle: '2FA ключ',
+        lblBackupCodes: 'Одноразовые коды',
         lblLive2faLine: 'Живой 2FA-код в Telegram',
         tapToCopyBadge: 'Копировать',
         accountPasswordInputLabel: 'Пароль от аккаунта (необязательно)',
@@ -747,12 +760,14 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
         btnCopyRichText: 'Copy for Telegram (linked key)',
         btnApplyParsed: 'Open this account on Client Screen',
         toastRichCopied: 'Formatted text with linked 2FA key copied!',
-        lblPsEmail: 'PlayStation login email',
-        lblPsPassword: 'PlayStation login password',
+        btnGenerateText: 'Generate text (add client + embed Mini App link)',
+        toastGeneratedSuccess: 'Client added & Mini App link embedded into key!',
+        lblPsEmail: 'PlayStation login',
+        lblPsPassword: 'PlayStation Password',
         lblMailPassword: 'Mail password',
-        lblDob: 'Date of Birth',
-        lbl2faGoogle: '2FA (Google)',
-        lblBackupCodes: '2FA backup codes',
+        lblDob: 'Date of birth',
+        lbl2faGoogle: '2FA key',
+        lblBackupCodes: 'Onetime codes',
         lblLive2faLine: 'Live 2FA code in Telegram',
         tapToCopyBadge: 'Copy',
         accountPasswordInputLabel: 'Account password (optional)',
@@ -1402,10 +1417,9 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
       const startParam = encodeStartAppParam(cleanedSecret, client.label, client.password || '');
       // Telegram caps ?startapp= at 64 chars. PlayStation 2FA keys are 103 chars (>64), which causes t.me/?startapp= to open the bot chat instead of the Mini App.
       // Using directWebAppUrl when startParam > 64 ensures clicking the key ALWAYS opens the Mini App with the live code, email, and password!
-      const tgBotDeepLink = shortName ? `https://t.me/${bot}/${shortName}?startapp=${startParam}` : `https://t.me/${bot}?startapp=${startParam}`;
-      const tgMiniAppLink = startParam.length <= 64 ? tgBotDeepLink : directWebAppUrl;
+      const tgMiniAppLink = shortName ? `https://t.me/${bot}/${shortName}?startapp=${startParam}` : `https://t.me/${bot}?startapp=${startParam}`;
 
-      return { tgMiniAppLink, directWebAppUrl, tgBotDeepLink };
+      return { tgMiniAppLink, directWebAppUrl };
     }
 
     function renderClientsList() {
@@ -1567,7 +1581,6 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
         if (!trimmed) return;
         const colonIdx = trimmed.indexOf(':');
         if (colonIdx === -1) {
-          // Check if standalone Base32 key
           const maybeKey = cleanBase32Secret(trimmed);
           if (!parsed.secret && maybeKey.length >= 16 && isValidBase32(maybeKey)) {
             parsed.secret = maybeKey;
@@ -1580,17 +1593,53 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
         const keyRaw = trimmed.slice(0, colonIdx).trim().toLowerCase();
         const val = trimmed.slice(colonIdx + 1).trim();
 
-        if (keyRaw.includes('login email') || keyRaw.includes('psn email') || keyRaw === 'email' || keyRaw.includes('почта для входа') || keyRaw.includes('пошта для входу')) {
-          parsed.email = val;
-        } else if (keyRaw.includes('login password') || keyRaw.includes('psn password') || keyRaw === 'password' || keyRaw.includes('пароль для входа') || keyRaw.includes('пароль для входу')) {
-          parsed.password = val;
-        } else if (keyRaw.includes('mail password') || keyRaw.includes('email password') || keyRaw.includes('пароль от почты') || keyRaw.includes('пароль від пошти')) {
+        if (
+          keyRaw.includes('mail password') ||
+          keyRaw.includes('email password') ||
+          keyRaw.includes('пароль от почты') ||
+          keyRaw.includes('пароль від пошти')
+        ) {
           parsed.mailPassword = val;
-        } else if (keyRaw.includes('birth') || keyRaw.includes('dob') || keyRaw.includes('дата рождения') || keyRaw.includes('дата народження')) {
+        } else if (
+          keyRaw.includes('login email') ||
+          keyRaw === 'playstation login' ||
+          keyRaw === 'psn login' ||
+          keyRaw === 'psn email' ||
+          keyRaw === 'email' ||
+          keyRaw === 'login' ||
+          keyRaw.includes('логин') ||
+          keyRaw.includes('логін') ||
+          keyRaw.includes('почта для входа') ||
+          keyRaw.includes('пошта для входу')
+        ) {
+          parsed.email = val;
+        } else if (
+          keyRaw.includes('password') ||
+          keyRaw.includes('пароль')
+        ) {
+          parsed.password = val;
+        } else if (
+          keyRaw.includes('birth') ||
+          keyRaw.includes('dob') ||
+          keyRaw.includes('дата рождения') ||
+          keyRaw.includes('дата народження')
+        ) {
           parsed.dob = val;
-        } else if (keyRaw.includes('backup') || keyRaw.includes('резервн')) {
+        } else if (
+          keyRaw.includes('backup') ||
+          keyRaw.includes('onetime') ||
+          keyRaw.includes('one-time') ||
+          keyRaw.includes('one time') ||
+          keyRaw.includes('резервн') ||
+          keyRaw.includes('одноразов')
+        ) {
           parsed.backupCodes = val;
-        } else if (keyRaw.includes('2fa') || keyRaw.includes('authenticator') || keyRaw.includes('totp')) {
+        } else if (
+          keyRaw.includes('2fa') ||
+          keyRaw.includes('authenticator') ||
+          keyRaw.includes('totp') ||
+          keyRaw.includes('ключ')
+        ) {
           const cleaned = cleanBase32Secret(val);
           if (isValidBase32(cleaned)) {
             parsed.secret = cleaned;
@@ -1611,12 +1660,10 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
       const pwd = (parsed.password || '').trim();
       const cleanedSecret = cleanBase32Secret(parsed.secret);
 
-      // Update active client screen state immediately
       state.activeSecret = cleanedSecret;
       state.activeLabel = emailLabel;
       state.activePassword = pwd;
 
-      // Check if client with this secret or email already exists in state.clients
       const existingIdx = state.clients.findIndex(
         c => cleanBase32Secret(c.secret) === cleanedSecret || (parsed.email && c.label.toLowerCase() === emailLabel.toLowerCase())
       );
@@ -1656,54 +1703,77 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
       const parsed = parseRawAccountText(inputEl.value);
       let tgLink = '';
       if (parsed.secret) {
-        const tempClient = {
+        // Find or build the exact same client object as manual addition and get its tgMiniAppLink (https://t.me/bot/shortName?startapp=...)
+        const existingClient = state.clients.find(c => cleanBase32Secret(c.secret) === cleanBase32Secret(parsed.secret));
+        const clientForLink = existingClient || {
           label: parsed.email || 'irishtashay679@outlook.com',
           password: parsed.password || '',
           secret: parsed.secret
         };
-        const links = buildClientLinks(tempClient);
-        tgLink = links.directWebAppUrl;
+        const links = buildClientLinks(clientForLink);
+        tgLink = links.tgMiniAppLink;
       }
 
-      const htmlLines = [];
-      const plainLines = [];
+      const htmlGroups = [];
+      const plainGroups = [];
 
+      // Group 1: PlayStation login & PlayStation Password
+      const g1Html = [], g1Plain = [];
       if (parsed.email) {
-        htmlLines.push(`<b>${escapeHtml(t('lblPsEmail'))}:</b> <code>${escapeHtml(parsed.email)}</code>`);
-        plainLines.push(`${t('lblPsEmail')}: ${parsed.email}`);
+        g1Html.push(`<b>${escapeHtml(t('lblPsEmail'))}:</b> <code>${escapeHtml(parsed.email)}</code>`);
+        g1Plain.push(`${t('lblPsEmail')}: ${parsed.email}`);
       }
       if (parsed.password) {
-        htmlLines.push(`<b>${escapeHtml(t('lblPsPassword'))}:</b> <code>${escapeHtml(parsed.password)}</code>`);
-        plainLines.push(`${t('lblPsPassword')}: ${parsed.password}`);
+        g1Html.push(`<b>${escapeHtml(t('lblPsPassword'))}:</b> <code>${escapeHtml(parsed.password)}</code>`);
+        g1Plain.push(`${t('lblPsPassword')}: ${parsed.password}`);
+      }
+      if (g1Html.length) {
+        htmlGroups.push(g1Html.join('<br>'));
+        plainGroups.push(g1Plain.join('\n'));
+      }
+
+      // Group 2: Mail password & Date of birth
+      const g2Html = [], g2Plain = [];
+      if (parsed.mailPassword) {
+        g2Html.push(`<b>${escapeHtml(t('lblMailPassword'))}:</b> <code>${escapeHtml(parsed.mailPassword)}</code>`);
+        g2Plain.push(`${t('lblMailPassword')}: ${parsed.mailPassword}`);
       }
       if (parsed.dob) {
-        htmlLines.push(`<b>${escapeHtml(t('lblDob'))}:</b> ${escapeHtml(parsed.dob)}`);
-        plainLines.push(`${t('lblDob')}: ${parsed.dob}`);
+        g2Html.push(`<b>${escapeHtml(t('lblDob'))}:</b> ${escapeHtml(parsed.dob)}`);
+        g2Plain.push(`${t('lblDob')}: ${parsed.dob}`);
       }
+      if (g2Html.length) {
+        htmlGroups.push(g2Html.join('<br>'));
+        plainGroups.push(g2Plain.join('\n'));
+      }
+
+      // Group 3: Onetime codes
       if (parsed.backupCodes) {
-        htmlLines.push(`<b>${escapeHtml(t('lblBackupCodes'))}:</b> <code>${escapeHtml(parsed.backupCodes)}</code>`);
-        plainLines.push(`${t('lblBackupCodes')}: ${parsed.backupCodes}`);
+        htmlGroups.push(`<b>${escapeHtml(t('lblBackupCodes'))}:</b> <code>${escapeHtml(parsed.backupCodes)}</code>`);
+        plainGroups.push(`${t('lblBackupCodes')}: ${parsed.backupCodes}`);
       }
-      parsed.extraLines.forEach(line => {
-        htmlLines.push(escapeHtml(line));
-        plainLines.push(line);
-      });
-      // Place 2FA (Google) key at the VERY BOTTOM underneath backup codes, with the Mini App link embedded in the key!
+
+      // Any extra unparsed lines
+      if (parsed.extraLines.length) {
+        htmlGroups.push(parsed.extraLines.map(l => escapeHtml(l)).join('<br>'));
+        plainGroups.push(parsed.extraLines.join('\n'));
+      }
+
+      // Group 4 (Bottom): 2FA key with embedded Telegram Mini App link
       if (parsed.secret) {
-        htmlLines.push(`<b>${escapeHtml(t('lbl2faGoogle'))}:</b> <a href="${escapeHtml(tgLink)}" data-open-client-preview="1" class="text-sky-400 underline font-mono font-bold">${escapeHtml(parsed.secret)}</a>`);
+        let g4Html = `<b>${escapeHtml(t('lbl2faGoogle'))}:</b> <a href="${escapeHtml(tgLink)}" class="text-sky-400 underline font-mono font-bold">${escapeHtml(parsed.secret)}</a>`;
+        let g4Plain = `${t('lbl2faGoogle')}: ${parsed.secret}`;
         if (chkExplicit && chkExplicit.checked) {
-          htmlLines.push(`🔗 <b>${escapeHtml(t('lblLive2faLine'))}:</b> <a href="${escapeHtml(tgLink)}" data-open-client-preview="1" class="text-emerald-400 underline">${escapeHtml(tgLink)}</a>`);
-          plainLines.push(`${t('lbl2faGoogle')}: ${parsed.secret}`);
-          plainLines.push(`🔗 ${t('lblLive2faLine')}: ${tgLink}`);
-        } else {
-          plainLines.push(`${t('lbl2faGoogle')}: ${parsed.secret}`);
-          plainLines.push(`🔗 ${t('lblLive2faLine')}: ${tgLink}`);
+          g4Html += `<br>🔗 <b>${escapeHtml(t('lblLive2faLine'))}:</b> <a href="${escapeHtml(tgLink)}" class="text-emerald-400 underline">${escapeHtml(tgLink)}</a>`;
+          g4Plain += `\n🔗 ${t('lblLive2faLine')}: ${tgLink}`;
         }
+        htmlGroups.push(g4Html);
+        plainGroups.push(g4Plain);
       }
 
       return {
-        html: htmlLines.join('<br>'),
-        plain: plainLines.join('\n'),
+        html: htmlGroups.join('<br><br>'),
+        plain: plainGroups.join('\n\n'),
         parsed,
         link: tgLink
       };
@@ -1882,10 +1952,19 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
         renderSmartParserPreview();
         rawDumpInput.addEventListener('input', () => {
           renderSmartParserPreview();
-          const { parsed } = buildSmartFormattedOutput();
-          if (parsed && parsed.secret) {
+        });
+      }
+      const btnGenText = document.getElementById('btnGenerateClientAndText');
+      if (btnGenText) {
+        btnGenText.addEventListener('click', () => {
+          const parsed = parseRawAccountText(rawDumpInput ? rawDumpInput.value : '');
+          if (parsed && parsed.secret && isValidBase32(parsed.secret)) {
             syncParsedClientToDatabase(parsed);
+            renderSmartParserPreview();
             tickTimer();
+            showToast(t('toastGeneratedSuccess'));
+          } else {
+            showToast(t('toastBulkError'));
           }
         });
       }
