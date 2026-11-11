@@ -1718,13 +1718,14 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
       const plainGroups = [];
 
       // Group 1: PlayStation login & PlayStation Password
+      // Use non-breaking space (\u00A0) after colon so Telegram's HTML clipboard parser never strips the space between tags
       const g1Html = [], g1Plain = [];
       if (parsed.email) {
-        g1Html.push(`<b>${escapeHtml(t('lblPsEmail'))}:</b> <code>${escapeHtml(parsed.email)}</code>`);
+        g1Html.push(`<b>${escapeHtml(t('lblPsEmail'))}:</b>\u00A0${escapeHtml(parsed.email)}`);
         g1Plain.push(`${t('lblPsEmail')}: ${parsed.email}`);
       }
       if (parsed.password) {
-        g1Html.push(`<b>${escapeHtml(t('lblPsPassword'))}:</b> <code>${escapeHtml(parsed.password)}</code>`);
+        g1Html.push(`<b>${escapeHtml(t('lblPsPassword'))}:</b>\u00A0${escapeHtml(parsed.password)}`);
         g1Plain.push(`${t('lblPsPassword')}: ${parsed.password}`);
       }
       if (g1Html.length) {
@@ -1735,11 +1736,11 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
       // Group 2: Mail password & Date of birth
       const g2Html = [], g2Plain = [];
       if (parsed.mailPassword) {
-        g2Html.push(`<b>${escapeHtml(t('lblMailPassword'))}:</b> <code>${escapeHtml(parsed.mailPassword)}</code>`);
+        g2Html.push(`<b>${escapeHtml(t('lblMailPassword'))}:</b>\u00A0${escapeHtml(parsed.mailPassword)}`);
         g2Plain.push(`${t('lblMailPassword')}: ${parsed.mailPassword}`);
       }
       if (parsed.dob) {
-        g2Html.push(`<b>${escapeHtml(t('lblDob'))}:</b> ${escapeHtml(parsed.dob)}`);
+        g2Html.push(`<b>${escapeHtml(t('lblDob'))}:</b>\u00A0${escapeHtml(parsed.dob)}`);
         g2Plain.push(`${t('lblDob')}: ${parsed.dob}`);
       }
       if (g2Html.length) {
@@ -1749,7 +1750,7 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
 
       // Group 3: Onetime codes
       if (parsed.backupCodes) {
-        htmlGroups.push(`<b>${escapeHtml(t('lblBackupCodes'))}:</b> <code>${escapeHtml(parsed.backupCodes)}</code>`);
+        htmlGroups.push(`<b>${escapeHtml(t('lblBackupCodes'))}:</b>\u00A0${escapeHtml(parsed.backupCodes)}`);
         plainGroups.push(`${t('lblBackupCodes')}: ${parsed.backupCodes}`);
       }
 
@@ -1759,12 +1760,12 @@ def get_2fa_keyboard(secret_key: str, label: str = "Account"):
         plainGroups.push(parsed.extraLines.join('\n'));
       }
 
-      // Group 4 (Bottom): 2FA key with embedded Telegram Mini App link
+      // Group 4 (Bottom): 2FA key with embedded Telegram Mini App link (include \u00A0 inside <b> before <a> so Telegram never collapses the space)
       if (parsed.secret) {
-        let g4Html = `<b>${escapeHtml(t('lbl2faGoogle'))}:</b> <a href="${escapeHtml(tgLink)}" class="text-sky-400 underline font-mono font-bold">${escapeHtml(parsed.secret)}</a>`;
+        let g4Html = `<b>${escapeHtml(t('lbl2faGoogle'))}:\u00A0</b><a href="${escapeHtml(tgLink)}" class="text-sky-400 underline font-mono font-bold">${escapeHtml(parsed.secret)}</a>`;
         let g4Plain = `${t('lbl2faGoogle')}: ${parsed.secret}`;
         if (chkExplicit && chkExplicit.checked) {
-          g4Html += `<br>🔗 <b>${escapeHtml(t('lblLive2faLine'))}:</b> <a href="${escapeHtml(tgLink)}" class="text-emerald-400 underline">${escapeHtml(tgLink)}</a>`;
+          g4Html += `<br>🔗 <b>${escapeHtml(t('lblLive2faLine'))}:\u00A0</b><a href="${escapeHtml(tgLink)}" class="text-emerald-400 underline">${escapeHtml(tgLink)}</a>`;
           g4Plain += `\n🔗 ${t('lblLive2faLine')}: ${tgLink}`;
         }
         htmlGroups.push(g4Html);
