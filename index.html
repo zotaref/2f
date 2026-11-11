@@ -66,8 +66,12 @@
   </div>
 
   <div class="max-w-md mx-auto px-3 py-3 sm:px-4 sm:py-6">
-    <!-- Language Switcher -->
-    <div class="flex items-center justify-end mb-3">
+    <!-- Top Bar: Open in Telegram App Button (shown in external browser) + Language Switcher -->
+    <div class="flex items-center justify-between gap-2 mb-3">
+      <a id="btnOpenInTgApp" href="#open-tg" class="hidden px-3 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-300 text-xs font-semibold transition-all items-center gap-1.5">
+        <span>📲</span>
+        <span data-i18n="openInTgBtn">Открыть в Telegram</span>
+      </a>
       <div class="flex items-center gap-1 bg-slate-900/95 border border-slate-800 p-1 rounded-xl shadow-md">
         <button type="button" data-lang-switch="ru" class="lang-btn min-w-[36px] min-h-[30px] px-2.5 py-1 rounded-lg text-xs font-bold transition-all bg-sky-500 text-slate-950 shadow-sm">RU</button>
         <button type="button" data-lang-switch="uk" class="lang-btn min-w-[36px] min-h-[30px] px-2.5 py-1 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-white">UA</button>
@@ -165,6 +169,7 @@
   <script>
     const I18N = {
       ru: {
+        openInTgBtn: 'Открыть в Telegram',
         pasteKeyPrompt: 'Вставьте ваш 2FA ключ из сообщения:',
         secretErrorText: 'Некорректный формат ключа Base32.',
         accountForLogin: 'Аккаунт для входа',
@@ -185,6 +190,7 @@
         toastPasswordCopied: 'Пароль скопирован'
       },
       uk: {
+        openInTgBtn: 'Відкрити в Telegram',
         pasteKeyPrompt: 'Вставте ваш 2FA ключ із повідомлення:',
         secretErrorText: 'Некоректний формат ключа Base32.',
         accountForLogin: 'Акаунт для входу',
@@ -205,6 +211,7 @@
         toastPasswordCopied: 'Пароль скопійовано'
       },
       en: {
+        openInTgBtn: 'Open in Telegram',
         pasteKeyPrompt: 'Paste your 2FA key from the message:',
         secretErrorText: 'Invalid Base32 key format.',
         accountForLogin: 'Account for login',
@@ -323,6 +330,22 @@
       return (bin % 1000000).toString().padStart(6, '0');
     }
 
+    function encodeStartAppParam(secret, label, password = '') {
+      const cleaned = cleanBase32Secret(secret);
+      if (!label && !password) return cleaned;
+      try {
+        const parts = [(label || '').trim(), (password || '').trim()];
+        while (parts.length > 0 && !parts[parts.length - 1]) parts.pop();
+        const bytes = new TextEncoder().encode(parts.join('||'));
+        let bin = '';
+        bytes.forEach(b => bin += String.fromCharCode(b));
+        const b64 = btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        return `${cleaned}__${b64}`;
+      } catch (e) {
+        return cleaned;
+      }
+    }
+
     function decodeStartAppParam(param) {
       if (!param) return null;
       const str = String(param).trim();
@@ -400,6 +423,19 @@
     }
 
     function updateUI() {
+      const openTgBtn = document.getElementById('btnOpenInTgApp');
+      const isInsideTg = Boolean(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData);
+      if (openTgBtn) {
+        if (!isInsideTg && state.secret) {
+          const sp = encodeStartAppParam(state.secret, state.label, state.password);
+          openTgBtn.href = `tg://resolve?domain=my_client2fa_bot&appname=totp&startapp=${sp}`;
+          openTgBtn.classList.remove('hidden');
+          openTgBtn.classList.add('inline-flex');
+        } else {
+          openTgBtn.classList.add('hidden');
+          openTgBtn.classList.remove('inline-flex');
+        }
+      }
       const accCard = document.getElementById('accountCopyCard');
       const pwdCard = document.getElementById('passwordCopyCard');
       const manualBox = document.getElementById('manualClientKeyBox');
